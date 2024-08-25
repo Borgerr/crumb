@@ -1,3 +1,3 @@
 # crumb
 
-A C compiler targetting x86_64-linux-gnu.
+A C compiler targetting x86_64-unknown-linux-gnu.
