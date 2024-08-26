@@ -38,13 +38,8 @@ fn main() {
     // driver
     let preprocessed_file = format!("{}.i", args.file_path);
     preprocess(&args.file_path, &preprocessed_file);
-    let assembly_file = compile(&preprocessed_file);
+    let assembly_file = compile(preprocessed_file, args.lex, args.parse, args.codegen);
     assemble(&assembly_file);
-
-    let contents = fs::read_to_string(&args.file_path)
-        .expect(&format!("Error reading file {}\n", args.file_path));
-
-    println!("CONTENTS:\n\n{contents}");
 }
 
 /// preprocesses the C file
@@ -70,6 +65,9 @@ fn preprocess(input_file: &String, preprocessed_file: &String) {
     )
 }
 
+/// Assemble the C file
+/// kind of cheating, but we're only writing a compiler, not a preprocessor,
+/// at least for now.
 fn assemble(input_file: &String) {
     let output_file = Path::new(input_file)
         .file_stem()
@@ -79,7 +77,7 @@ fn assemble(input_file: &String) {
     let output = if cfg!(target_os = "windows") {
         todo!("This compiler currently targets x64 Linux. Make a PR or an issue if you want a different target.")
     } else {
-        process::Command::new("gcc")
+        process::Command::new("gcc") // this isn't what it looks like!!
             .args([input_file, "-o", output_file])
             .output()
             .expect("failed to execute preprocesser")
