@@ -2,20 +2,7 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use std::{fmt::Display, fs};
 
-lazy_static! {
-    static ref idre: Regex =
-        Regex::new(r"[a-zA-Z_]\w*\b").expect("failure creating identifier regex");
-    static ref constre: Regex = Regex::new(r"[0-9]+\b").expect("failure creating const regex");
-    static ref intre: Regex = Regex::new(r"int\b").expect("failure creating int type regex");
-    static ref voidre: Regex = Regex::new(r"void\b").expect("failure creating void type regex");
-    static ref retre: Regex =
-        Regex::new(r"return\b").expect("failure creating return keyword regex");
-    static ref oparenre: Regex = Regex::new(r"\(").expect("failure creating open paren regex");
-    static ref cloparenre: Regex = Regex::new(r"\)").expect("failure creating close paren regex");
-    static ref obracere: Regex = Regex::new(r"{").expect("failure creating open brace regex");
-    static ref clobracere: Regex = Regex::new(r"}").expect("failure creating close brace regex");
-    static ref sclnre: Regex = Regex::new(r";").expect("failure creating semicolon regex");
-}
+lazy_static! {}
 
 /// Type representing individual tokens.
 /// Tree structure should not be here.
@@ -66,65 +53,45 @@ impl Display for Type {
 /// Tokenize function, literally translating a source file
 /// into a stream of tokens.
 pub fn tokenize(input_file: String) -> Vec<Token> {
-    // while input isn't empty:
-    //  if input starts with whitespace:
-    //      trim whitespace from start of input
-    //  else:
-    //      find longest match at start of input for any regex in Table 1-1
-    //      if no match found, raise an error
-    //      convert matching substring into a token
-    //      remove matching substring from start of input
+    let idre = Regex::new(r"^[a-zA-Z_]\w*\b").expect("failure creating identifier regex");
+    let constre = Regex::new(r"^[0-9]+\b").expect("failure creating const regex");
     let s = fs::read_to_string(input_file).expect("(!) Error reading file");
     let mut strang = s.as_str().trim();
     let mut returned = Vec::new();
 
     while !(strang.is_empty()) {
         strang = strang.trim_start();
-        returned.push(match strang {
-            s if idre.is_match(s) => {
-                println!("IDENTIFIER s = {}", s);
-                strang = strang.trim_start_matches(idre.find(s).unwrap().as_str());
-                check_for_keywords(s)
+        returned.push(if let Some(mat) = idre.find(strang) {
+            strang = strang.trim_start_matches(mat.as_str());
+            check_for_keywords(mat.as_str())
+        } else if let Some(mat) = constre.find(strang) {
+            strang = strang.trim_start_matches(mat.as_str());
+            Token::Constant {
+                val: mat.as_str().parse().expect(&format!(
+                    "failure parsing constant {} as integer",
+                    mat.as_str()
+                )),
             }
-            s if constre.is_match(s) => {
-                println!("CONSTANT s = {}", s);
-                strang = strang.trim_start_matches(s);
-                Token::Constant {
-                    val: s
-                        .parse()
-                        .expect(&format!("failure parsing constant {} as integer", s)),
-                }
-            }
-            s if oparenre.is_match(s) => {
-                println!("OPEN PAREN s = {}", s);
-                strang = strang.trim_start_matches("(");
-                Token::OpenParens
-            }
-            s if cloparenre.is_match(s) => {
-                println!("CLOSE PAREN s = {}", s);
-                strang = strang.trim_start_matches(")");
-                Token::CloseParens
-            }
-            s if obracere.is_match(s) => {
-                println!("OPEN BRACE s = {}", s);
-                strang = strang.trim_start_matches("{{");
-                Token::OpenBrace
-            }
-            s if clobracere.is_match(s) => {
-                println!("CLOSE BRACE s = {}", s);
-                strang = strang.trim_start_matches("}}");
-                Token::CloseBrace
-            }
-            s if sclnre.is_match(s) => {
-                println!("SEMICOLON s = {}", s);
-                strang = strang.trim_start_matches(";");
-                Token::Semicolon
-            }
-            _ => panic!("Parse error with string {}", strang),
+        } else if strang.starts_with(r"(") {
+            strang = strang.trim_start_matches(r"(");
+            Token::OpenParens
+        } else if strang.starts_with(r")") {
+            strang = strang.trim_start_matches(r")");
+            Token::CloseParens
+        } else if strang.starts_with(r"{") {
+            strang = strang.trim_start_matches(r"{");
+            Token::OpenBrace
+        } else if strang.starts_with(r"}") {
+            strang = strang.trim_start_matches(r"}");
+            Token::CloseBrace
+        } else if strang.starts_with(r";") {
+            strang = strang.trim_start_matches(r";");
+            Token::Semicolon
+        } else {
+            panic!("Syntax error");
         });
     }
 
-    returned.reverse();
     returned
 }
 
