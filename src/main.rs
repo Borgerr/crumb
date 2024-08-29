@@ -1,5 +1,5 @@
 use clap::Parser;
-use std::{fs, path::Path, process, str};
+use std::{path::Path, process, str};
 
 mod compiler;
 use compiler::compile;

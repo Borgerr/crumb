@@ -57,11 +57,11 @@ pub fn tokenize(input_file: String) -> Vec<Token> {
     let constre = Regex::new(r"^[0-9]+\b").expect("failure creating const regex");
     let s = fs::read_to_string(input_file).expect("(!) Error reading file");
     let mut strang = s.as_str().trim();
-    let mut returned = Vec::new();
+    let mut tokens = Vec::new();
 
     while !(strang.is_empty()) {
         strang = strang.trim_start();
-        returned.push(if let Some(mat) = idre.find(strang) {
+        tokens.push(if let Some(mat) = idre.find(strang) {
             strang = strang.trim_start_matches(mat.as_str());
             check_for_keywords(mat.as_str())
         } else if let Some(mat) = constre.find(strang) {
@@ -88,11 +88,11 @@ pub fn tokenize(input_file: String) -> Vec<Token> {
             strang = strang.trim_start_matches(r";");
             Token::Semicolon
         } else {
-            panic!("Syntax error");
+            panic!("Syntax error with strang = {}", strang);
         });
     }
 
-    returned
+    tokens
 }
 
 fn check_for_keywords(strang: &str) -> Token {
