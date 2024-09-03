@@ -38,7 +38,7 @@ fn main() {
     // driver
     let preprocessed_file = format!("{}.i", args.file_path);
     preprocess(&args.file_path, &preprocessed_file);
-    let assembly_file = compile(preprocessed_file, args.lex, args.parse, args.codegen);
+    let assembly_file = compile(preprocessed_file, args.lex, args.parse, args.codegen).unwrap();
     println!("(!!!) assembly_file = {}", assembly_file);
     assemble(&assembly_file);
 }

@@ -1,9 +1,32 @@
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::{fmt::Display, fs};
+use thiserror::Error;
 
-lazy_static! {}
+lazy_static! {
+    static ref idre: Regex =
+        Regex::new(r"^[a-zA-Z_]\w*\b").expect("failure creating identifier regex");
+    static ref constre: Regex = Regex::new(r"^[0-9]+\b").expect("failure creating const regex");
+}
 
+#[derive(Clone, Error, Debug)]
+pub enum ParseError {
+    Unrecognized { strang: String },
+}
+
+impl Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Unrecognized { strang } => write!(
+                f,
+                "(!) Parse error: Unrecognized syntax on string: {}",
+                strang
+            ),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 /// Type representing individual tokens.
 /// Tree structure should not be here.
 pub enum Token {
@@ -34,6 +57,7 @@ impl Display for Token {
     }
 }
 
+#[derive(Clone, Debug)]
 /// Type for types supported by the compiler.
 /// Only useful in tokenizing.
 pub enum Type {
@@ -52,9 +76,7 @@ impl Display for Type {
 
 /// Tokenize function, literally translating a source file
 /// into a stream of tokens.
-pub fn tokenize(input_file: String) -> Vec<Token> {
-    let idre = Regex::new(r"^[a-zA-Z_]\w*\b").expect("failure creating identifier regex");
-    let constre = Regex::new(r"^[0-9]+\b").expect("failure creating const regex");
+pub fn tokenize(input_file: String) -> Result<Vec<Token>, ParseError> {
     let s = fs::read_to_string(input_file).expect("(!) Error reading file");
     let mut strang = s.as_str().trim();
     let mut tokens = Vec::new();
@@ -67,10 +89,7 @@ pub fn tokenize(input_file: String) -> Vec<Token> {
         } else if let Some(mat) = constre.find(strang) {
             strang = strang.trim_start_matches(mat.as_str());
             Token::Constant {
-                val: mat.as_str().parse().expect(&format!(
-                    "failure parsing constant {} as integer",
-                    mat.as_str()
-                )),
+                val: mat.as_str().parse().unwrap(),
             }
         } else if strang.starts_with(r"(") {
             strang = strang.trim_start_matches(r"(");
@@ -88,11 +107,13 @@ pub fn tokenize(input_file: String) -> Vec<Token> {
             strang = strang.trim_start_matches(r";");
             Token::Semicolon
         } else {
-            panic!("Syntax error with strang = {}", strang);
+            return Err(ParseError::Unrecognized {
+                strang: strang.to_string(),
+            });
         });
     }
 
-    tokens
+    Ok(tokens)
 }
 
 fn check_for_keywords(strang: &str) -> Token {
