@@ -10,23 +10,23 @@ lazy_static! {
 }
 
 #[derive(Clone, Error, Debug)]
-pub enum ParseError {
+pub enum LexError {
     Unrecognized { strang: String },
 }
 
-impl Display for ParseError {
+impl Display for LexError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Unrecognized { strang } => write!(
                 f,
-                "(!) Parse error: Unrecognized syntax on string: {}",
+                "(!) Lexer error: Unrecognized syntax on string: {}",
                 strang
             ),
         }
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 /// Type representing individual tokens.
 /// Tree structure should not be here.
 pub enum Token {
@@ -57,7 +57,7 @@ impl Display for Token {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 /// Type for types supported by the compiler.
 /// Only useful in tokenizing.
 pub enum Type {
@@ -76,7 +76,7 @@ impl Display for Type {
 
 /// Tokenize function, literally translating a source file
 /// into a stream of tokens.
-pub fn tokenize(input_file: String) -> Result<Vec<Token>, ParseError> {
+pub fn tokenize(input_file: String) -> Result<Vec<Token>, LexError> {
     let s = fs::read_to_string(input_file).expect("(!) Error reading file");
     let mut strang = s.as_str().trim();
     let mut tokens = Vec::new();
@@ -107,7 +107,7 @@ pub fn tokenize(input_file: String) -> Result<Vec<Token>, ParseError> {
             strang = strang.trim_start_matches(r";");
             Token::Semicolon
         } else {
-            return Err(ParseError::Unrecognized {
+            return Err(LexError::Unrecognized {
                 strang: strang.to_string(),
             });
         });
