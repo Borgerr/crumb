@@ -46,6 +46,7 @@ impl Display for ParseError {
  * <int> ? A constant token ?
  */
 
+#[derive(PartialEq, Debug)]
 pub enum AST {
     Program {
         function: Box<AST>,
@@ -91,8 +92,9 @@ pub fn parse(tokens: Vec<Token>) -> Result<AST, ParseError> {
 fn parse_fundef(tokens: &mut IntoIter<Token>) -> Result<AST, ParseError> {
     if expect_token(tokens)? != (Token::TyKeyword { ty: Type::Int }) {
         return Err(ParseError::FundefError {
-            reason: "expected a function definition but first token was not a valid return type"
-                .to_string(),
+            reason: String::from(
+                "expected a function definition but first token was not a valid return type",
+            ),
         });
     }
 
@@ -109,8 +111,7 @@ fn parse_fundef(tokens: &mut IntoIter<Token>) -> Result<AST, ParseError> {
 
     if expect_token(tokens)? != (Token::TyKeyword { ty: Type::Void }) {
         return Err(ParseError::FundefError {
-            reason: "expected a function definition but first token was not a valid return type"
-                .to_string(),
+            reason: String::from("crumb v0.1.0 only accepts the `void` parameter"),
         });
     }
 

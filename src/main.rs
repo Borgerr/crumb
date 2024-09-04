@@ -4,6 +4,9 @@ use std::{path::Path, process, str};
 mod compiler;
 use compiler::compile;
 
+#[cfg(test)]
+mod test;
+
 #[derive(Parser, Debug)]
 #[command(version("0.1.0"), about = "A C compiler", long_about = None)]
 struct Args {
@@ -60,7 +63,7 @@ fn preprocess(input_file: &String, preprocessed_file: &String) {
     };
 
     println!(
-        "(-) Preprocessing complete\n\n(-) stdout:\n{}\n\n(-) stderr:\n{}",
+        "(-) Preprocessing complete\n\n(-) stdout:\n{}\n\n(-) stderr:\n{}\n\n",
         str::from_utf8(&output.stdout).expect("Invalid UTF-8 sequence"),
         str::from_utf8(&output.stderr).expect("Invalid UTF-8 sequence")
     )
@@ -85,7 +88,7 @@ fn assemble(input_file: &String) {
     };
 
     println!(
-        "(-) Preprocessing complete\n\n(-) stdout:\n{}\n\n(-) stderr:\n{}",
+        "(-) Preprocessing complete\n\n(-) stdout:\n{}\n\n(-) stderr:\n{}\n\n",
         str::from_utf8(&output.stdout).expect("Invalid UTF-8 sequence"),
         str::from_utf8(&output.stderr).expect("Invalid UTF-8 sequence")
     )

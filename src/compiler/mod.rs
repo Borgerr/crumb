@@ -1,8 +1,8 @@
-mod lexer;
-use std::fmt::Display;
+pub mod lexer;
+use std::{fmt::Display, fs};
 
 use lexer::tokenize;
-mod parser;
+pub mod parser;
 use parser::parse;
 use thiserror::Error;
 
@@ -25,12 +25,13 @@ impl Display for CompileError {
 /// - p: bool, stop after parsing
 /// - c: bool, stop after assembly code generation
 pub fn compile(input_file: String, l: bool, p: bool, c: bool) -> Result<String, CompileError> {
-    let res = tokenize(input_file);
+    let source = fs::read_to_string(input_file).expect("(!) Error reading file");
+    let res = tokenize(source);
     if let Err(e) = res {
         return Err(CompileError::Lex { e });
     }
     if l {
-        return Ok("magic words".to_string());
+        return Ok(String::from("magic words"));
     }
     let mut iter = res.clone().unwrap().into_iter();
     while let Some(t) = iter.next() {

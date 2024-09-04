@@ -76,9 +76,8 @@ impl Display for Type {
 
 /// Tokenize function, literally translating a source file
 /// into a stream of tokens.
-pub fn tokenize(input_file: String) -> Result<Vec<Token>, LexError> {
-    let s = fs::read_to_string(input_file).expect("(!) Error reading file");
-    let mut strang = s.as_str().trim();
+pub fn tokenize(source: String) -> Result<Vec<Token>, LexError> {
+    let mut strang = source.as_str().trim();
     let mut tokens = Vec::new();
 
     while !(strang.is_empty()) {
@@ -122,7 +121,7 @@ fn check_for_keywords(strang: &str) -> Token {
         s if s.starts_with("void") => Token::TyKeyword { ty: Type::Void },
         s if s.starts_with("return") => Token::RetKeyword,
         _ => Token::Identifier {
-            val: strang.to_string(),
+            val: String::from(strang),
         },
     }
 }
