@@ -62,10 +62,26 @@ pub enum AST {
     },
 }
 
+impl Display for AST {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Program { function } => write!(f, "program with inner function : {}", function),
+            Self::FunDef {
+                identifier,
+                statement,
+            } => write!(f, "function {} with definition : {}", identifier, statement),
+            Self::Statement { exp } => write!(f, "statement with inner expression : {}", exp),
+            Self::Expression { c } => write!(f, "expression with c = {}", c),
+        }
+    }
+}
+
 /// Big scary parse function.
 /// As of v0.1.0, a thin wrapper over parse_fundef.
 pub fn parse(tokens: Vec<Token>) -> Result<AST, ParseError> {
-    parse_fundef(&mut tokens.into_iter())
+    Ok(AST::Program {
+        function: Box::new(parse_fundef(&mut tokens.into_iter())?),
+    })
 }
 
 /// Expects a function definition.
@@ -73,13 +89,7 @@ pub fn parse(tokens: Vec<Token>) -> Result<AST, ParseError> {
 /// ### v0.1.0 function definition grammar
 /// `<function> ::= "int" <identifier> "(" "void" ")" "{" <statement> "}"`
 fn parse_fundef(tokens: &mut IntoIter<Token>) -> Result<AST, ParseError> {
-    if let Token::TyKeyword { ty } = expect_token(tokens)? {
-        if ty != Type::Int {
-            return Err(ParseError::FundefError {
-                reason: "type given but crumb v0.1.0 only allows int return types".to_string(),
-            });
-        }
-    } else {
+    if expect_token(tokens)? != (Token::TyKeyword { ty: Type::Int }) {
         return Err(ParseError::FundefError {
             reason: "expected a function definition but first token was not a valid return type"
                 .to_string(),
@@ -97,13 +107,7 @@ fn parse_fundef(tokens: &mut IntoIter<Token>) -> Result<AST, ParseError> {
 
     expect_variant(tokens, Token::OpenParens)?;
 
-    if let Token::TyKeyword { ty } = expect_token(tokens)? {
-        if !matches!(ty, Type::Void) {
-            return Err(ParseError::FundefError {
-                reason: "type given but crumb v0.1.0 only allows int return types".to_string(),
-            });
-        }
-    } else {
+    if expect_token(tokens)? != (Token::TyKeyword { ty: Type::Void }) {
         return Err(ParseError::FundefError {
             reason: "expected a function definition but first token was not a valid return type"
                 .to_string(),
@@ -121,8 +125,33 @@ fn parse_fundef(tokens: &mut IntoIter<Token>) -> Result<AST, ParseError> {
     Ok(function)
 }
 
+/// Expects a statement.
+/// If this isn't found, returns an error.
+/// ### v0.1.0 statement grammar
+/// `<statement> ::= "return" <exp> ";"`
 fn parse_statement(tokens: &mut IntoIter<Token>) -> Result<AST, ParseError> {
-    todo!("implement")
+    expect_variant(tokens, Token::RetKeyword)?;
+    let ret = Ok(AST::Statement {
+        exp: Box::new(parse_exp(tokens)?),
+    });
+    expect_variant(tokens, Token::Semicolon)?;
+    ret
+}
+
+/// Expects an expression.
+/// If this isn't found, returns an error.
+/// ### v0.1.0 exp grammar
+/// `<exp> ::= <int>`
+fn parse_exp(tokens: &mut IntoIter<Token>) -> Result<AST, ParseError> {
+    let got = expect_token(tokens)?;
+    if let Token::Constant { val } = got {
+        Ok(AST::Expression { c: val })
+    } else {
+        Err(ParseError::InvalidSyntax {
+            got,
+            expected: Token::Constant { val: 42 },
+        })
+    }
 }
 
 fn expect_token(tokens: &mut IntoIter<Token>) -> Result<Token, ParseError> {

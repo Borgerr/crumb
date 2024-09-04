@@ -39,5 +39,10 @@ pub fn compile(input_file: String, l: bool, p: bool, c: bool) -> Result<String, 
 
     let res = parse(res.unwrap());
 
+    match res {
+        Ok(t) => println!("RETURNED VALID AST t = {}", t),
+        Err(e) => println!("RETURNED ERROR e = {}", e),
+    }
+
     Ok(String::from("COMPILE RETURNED WOOHOO!!!"))
 }
