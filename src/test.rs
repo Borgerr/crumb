@@ -1,4 +1,7 @@
-use crate::compiler::{lexer, parser};
+use crate::compiler::{
+    asmgen::{self, FunDefAsm, InstructionAsm, ProgramAsm},
+    lexer, parser,
+};
 
 static BASIC_RETURN_FROM_MAIN: &str = "int main(void) { return 2; }";
 static WHITESPACELESS_RETURN_FROM_MAIN: &str = "int main(void){return 2;}";
@@ -42,8 +45,8 @@ fn basic_return_from_main_parse() {
             parser::ProgramC {
                 function: Box::new(parser::FunDefC {
                     identifier: String::from("main"),
-                    statement: Box::new(parser::StatementC {
-                        exp: Box::new(parser::ExpC { c: 2 })
+                    statement: Box::new(parser::StatementC::Return {
+                        exp: Box::new(parser::ExpC::Const { c: 2 })
                     })
                 })
             }
@@ -51,6 +54,32 @@ fn basic_return_from_main_parse() {
     } else {
         assert!(false)
     }
+}
+
+#[test]
+fn basic_return_from_main_asmgen() {
+    let source = BASIC_RETURN_FROM_MAIN.to_owned();
+
+    assert_eq!(
+        asmgen::asmgen(
+            parser::parse(lexer::tokenize(source).expect("expected valid stream of tokens"))
+                .expect("expected valid parsing of tokens")
+        ),
+        asmgen::ProgramAsm {
+            function: Box::new(asmgen::FunDefAsm {
+                identifier: String::from("main"),
+                instructions: vec![
+                    asmgen::InstructionAsm::Mov {
+                        src: asmgen::OperandAsm::Imm { int: 2 },
+                        dst: asmgen::OperandAsm::Reg {
+                            r: asmgen::Register::EAX
+                        },
+                    },
+                    asmgen::InstructionAsm::Ret
+                ]
+            })
+        }
+    )
 }
 
 #[test]
@@ -92,8 +121,8 @@ fn whitespaceless_return_from_main_parse() {
             parser::ProgramC {
                 function: Box::new(parser::FunDefC {
                     identifier: String::from("main"),
-                    statement: Box::new(parser::StatementC {
-                        exp: Box::new(parser::ExpC { c: 2 })
+                    statement: Box::new(parser::StatementC::Return {
+                        exp: Box::new(parser::ExpC::Const { c: 2 })
                     })
                 })
             }
@@ -101,4 +130,30 @@ fn whitespaceless_return_from_main_parse() {
     } else {
         assert!(false)
     }
+}
+
+#[test]
+fn whitespaceless_return_from_main_asmgen() {
+    let source = WHITESPACELESS_RETURN_FROM_MAIN.to_owned();
+
+    assert_eq!(
+        asmgen::asmgen(
+            parser::parse(lexer::tokenize(source).expect("expected valid stream of tokens"))
+                .expect("expected valid parsing of tokens")
+        ),
+        asmgen::ProgramAsm {
+            function: Box::new(asmgen::FunDefAsm {
+                identifier: String::from("main"),
+                instructions: vec![
+                    asmgen::InstructionAsm::Mov {
+                        src: asmgen::OperandAsm::Imm { int: 2 },
+                        dst: asmgen::OperandAsm::Reg {
+                            r: asmgen::Register::EAX
+                        },
+                    },
+                    asmgen::InstructionAsm::Ret
+                ]
+            })
+        }
+    )
 }

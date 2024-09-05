@@ -35,7 +35,7 @@ impl Display for ParseError {
  * function_definition = Function(identifier name, statement)
  * statement = Return(exp)
  * exp = Constant(int)
- */
+*/
 
 /* FORMAL GRAMMAR: (as of v0.1.0)
  * <program> ::= <function>
@@ -44,7 +44,7 @@ impl Display for ParseError {
  * <exp> ::= <int>
  * <identifier> ? An identifier token ?
  * <int> ? A constant token ?
- */
+*/
 
 #[derive(PartialEq, Debug)]
 pub struct ProgramC {
@@ -74,24 +74,28 @@ impl Display for FunDefC {
 }
 
 #[derive(PartialEq, Debug)]
-pub struct StatementC {
-    pub exp: Box<ExpC>,
+pub enum StatementC {
+    Return { exp: Box<ExpC> },
 }
 
 impl Display for StatementC {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "StatementC with inner exp : {}", self.exp)
+        match self {
+            Self::Return { exp } => write!(f, "return expression with inner exp : {}", exp),
+        }
     }
 }
 
 #[derive(PartialEq, Debug)]
-pub struct ExpC {
-    pub c: i32,
+pub enum ExpC {
+    Const { c: i32 },
 }
 
 impl Display for ExpC {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ExpC with c = {}", self.c)
+        match self {
+            Self::Const { c } => write!(f, "ExpC with c = {}", c),
+        }
     }
 }
 
@@ -150,7 +154,7 @@ fn parse_fundef(tokens: &mut IntoIter<Token>) -> Result<FunDefC, ParseError> {
 /// `<statement> ::= "return" <exp> ";"`
 fn parse_statement(tokens: &mut IntoIter<Token>) -> Result<StatementC, ParseError> {
     expect_variant(tokens, Token::RetKeyword)?;
-    let ret = Ok(StatementC {
+    let ret = Ok(StatementC::Return {
         exp: Box::new(parse_exp(tokens)?),
     });
     expect_variant(tokens, Token::Semicolon)?;
@@ -164,7 +168,7 @@ fn parse_statement(tokens: &mut IntoIter<Token>) -> Result<StatementC, ParseErro
 fn parse_exp(tokens: &mut IntoIter<Token>) -> Result<ExpC, ParseError> {
     let got = expect_token(tokens)?;
     if let Token::Constant { val } = got {
-        Ok(ExpC { c: val })
+        Ok(ExpC::Const { c: val })
     } else {
         Err(ParseError::InvalidSyntax {
             got,

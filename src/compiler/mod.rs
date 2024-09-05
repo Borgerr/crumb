@@ -1,13 +1,14 @@
 use std::{fmt::Display, fs};
+use thiserror::Error;
 
 pub mod lexer;
 use lexer::tokenize;
 
 pub mod parser;
 use parser::parse;
-use thiserror::Error;
 
-pub mod codegen;
+pub mod asmgen;
+use asmgen::asmgen;
 
 #[derive(Error, Debug)]
 pub enum CompileError {
@@ -52,6 +53,8 @@ pub fn compile(input_file: String, l: bool, p: bool, c: bool) -> Result<String, 
         }
         return Ok(String::from("magic words"));
     }
+
+    let res = asmgen(res.unwrap());
 
     Ok(String::from("COMPILE RETURNED WOOHOO!!!"))
 }
