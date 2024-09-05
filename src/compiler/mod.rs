@@ -8,9 +8,7 @@ pub mod parser;
 use parser::parse;
 
 pub mod asmgen;
-use asmgen::asmgen;
-
-pub mod asmemit;
+use asmgen::{emit_asm, gen_asm};
 
 #[derive(Error, Debug)]
 pub enum CompileError {
@@ -36,7 +34,7 @@ impl Display for CompileError {
 /// - p: bool, stop after parsing
 /// - c: bool, stop after assembly code generation
 pub fn compile(input_file: String, l: bool, p: bool, c: bool) -> Result<String, CompileError> {
-    let source = match fs::read_to_string(input_file) {
+    let source = match fs::read_to_string(input_file.clone()) {
         Ok(s) => s,
         Err(e) => return Err(CompileError::FileRead { e }),
     };
@@ -64,7 +62,13 @@ pub fn compile(input_file: String, l: bool, p: bool, c: bool) -> Result<String, 
             }
         }
     };
-    let asm_ast = asmgen(c_ast);
+    let asm_ast = gen_asm(c_ast);
+    if c {
+        println!("GENERATED ASSEMBLY: {}", asm_ast);
+        return Ok(String::from("Magic words"));
+    } else if let Err(e) = emit_asm(asm_ast, format!("{}.i", input_file)) {
+        return Err(todo!("determine error"));
+    }
 
     Ok(String::from("COMPILE RETURNED WOOHOO!!!"))
 }

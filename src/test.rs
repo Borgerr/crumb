@@ -61,7 +61,7 @@ fn basic_return_from_main_asmgen() {
     let source = BASIC_RETURN_FROM_MAIN.to_owned();
 
     assert_eq!(
-        asmgen::asmgen(
+        asmgen::gen_asm(
             parser::parse(lexer::tokenize(source).expect("expected valid stream of tokens"))
                 .expect("expected valid parsing of tokens")
         ),
@@ -137,7 +137,7 @@ fn whitespaceless_return_from_main_asmgen() {
     let source = WHITESPACELESS_RETURN_FROM_MAIN.to_owned();
 
     assert_eq!(
-        asmgen::asmgen(
+        asmgen::gen_asm(
             parser::parse(lexer::tokenize(source).expect("expected valid stream of tokens"))
                 .expect("expected valid parsing of tokens")
         ),

@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::{fmt::Display, fs};
+use std::fmt::Display;
 use thiserror::Error;
 
 lazy_static! {
