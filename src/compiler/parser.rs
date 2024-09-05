@@ -47,40 +47,58 @@ impl Display for ParseError {
  */
 
 #[derive(PartialEq, Debug)]
-pub enum AST {
-    Program {
-        function: Box<AST>,
-    },
-    FunDef {
-        identifier: String,
-        statement: Box<AST>,
-    },
-    Statement {
-        exp: Box<AST>,
-    },
-    Expression {
-        c: i32,
-    },
+pub struct ProgramC {
+    pub function: Box<FunDefC>,
 }
 
-impl Display for AST {
+impl Display for ProgramC {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Program { function } => write!(f, "program with inner function : {}", function),
-            Self::FunDef {
-                identifier,
-                statement,
-            } => write!(f, "function {} with definition : {}", identifier, statement),
-            Self::Statement { exp } => write!(f, "statement with inner expression : {}", exp),
-            Self::Expression { c } => write!(f, "expression with c = {}", c),
-        }
+        write!(f, "ProgramC with inner FunDefC : {}", self.function)
+    }
+}
+
+#[derive(PartialEq, Debug)]
+pub struct FunDefC {
+    pub identifier: String,
+    pub statement: Box<StatementC>,
+}
+
+impl Display for FunDefC {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "FunDefC with identifier ({}) and inner statement : {}",
+            self.identifier, self.statement
+        )
+    }
+}
+
+#[derive(PartialEq, Debug)]
+pub struct StatementC {
+    pub exp: Box<ExpC>,
+}
+
+impl Display for StatementC {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "StatementC with inner exp : {}", self.exp)
+    }
+}
+
+#[derive(PartialEq, Debug)]
+pub struct ExpC {
+    pub c: i32,
+}
+
+impl Display for ExpC {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ExpC with c = {}", self.c)
     }
 }
 
 /// Big scary parse function.
 /// As of v0.1.0, a thin wrapper over parse_fundef.
-pub fn parse(tokens: Vec<Token>) -> Result<AST, ParseError> {
-    Ok(AST::Program {
+pub fn parse(tokens: Vec<Token>) -> Result<ProgramC, ParseError> {
+    Ok(ProgramC {
         function: Box::new(parse_fundef(&mut tokens.into_iter())?),
     })
 }
@@ -89,7 +107,7 @@ pub fn parse(tokens: Vec<Token>) -> Result<AST, ParseError> {
 /// If this isn't found, returns an error.
 /// ### v0.1.0 function definition grammar
 /// `<function> ::= "int" <identifier> "(" "void" ")" "{" <statement> "}"`
-fn parse_fundef(tokens: &mut IntoIter<Token>) -> Result<AST, ParseError> {
+fn parse_fundef(tokens: &mut IntoIter<Token>) -> Result<FunDefC, ParseError> {
     if expect_token(tokens)? != (Token::TyKeyword { ty: Type::Int }) {
         return Err(ParseError::FundefError {
             reason: String::from(
@@ -117,7 +135,7 @@ fn parse_fundef(tokens: &mut IntoIter<Token>) -> Result<AST, ParseError> {
 
     expect_variant(tokens, Token::CloseParens)?;
     expect_variant(tokens, Token::OpenBrace)?;
-    let function = AST::FunDef {
+    let function = FunDefC {
         identifier: id_string,
         statement: Box::new(parse_statement(tokens)?),
     };
@@ -130,9 +148,9 @@ fn parse_fundef(tokens: &mut IntoIter<Token>) -> Result<AST, ParseError> {
 /// If this isn't found, returns an error.
 /// ### v0.1.0 statement grammar
 /// `<statement> ::= "return" <exp> ";"`
-fn parse_statement(tokens: &mut IntoIter<Token>) -> Result<AST, ParseError> {
+fn parse_statement(tokens: &mut IntoIter<Token>) -> Result<StatementC, ParseError> {
     expect_variant(tokens, Token::RetKeyword)?;
-    let ret = Ok(AST::Statement {
+    let ret = Ok(StatementC {
         exp: Box::new(parse_exp(tokens)?),
     });
     expect_variant(tokens, Token::Semicolon)?;
@@ -143,10 +161,10 @@ fn parse_statement(tokens: &mut IntoIter<Token>) -> Result<AST, ParseError> {
 /// If this isn't found, returns an error.
 /// ### v0.1.0 exp grammar
 /// `<exp> ::= <int>`
-fn parse_exp(tokens: &mut IntoIter<Token>) -> Result<AST, ParseError> {
+fn parse_exp(tokens: &mut IntoIter<Token>) -> Result<ExpC, ParseError> {
     let got = expect_token(tokens)?;
     if let Token::Constant { val } = got {
-        Ok(AST::Expression { c: val })
+        Ok(ExpC { c: val })
     } else {
         Err(ParseError::InvalidSyntax {
             got,

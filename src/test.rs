@@ -1,7 +1,4 @@
-use crate::compiler::{
-    lexer::{self, Token, Type},
-    parser::{parse, AST},
-};
+use crate::compiler::{lexer, parser};
 
 static BASIC_RETURN_FROM_MAIN: &str = "int main(void) { return 2; }";
 static WHITESPACELESS_RETURN_FROM_MAIN: &str = "int main(void){return 2;}";
@@ -10,18 +7,22 @@ static WHITESPACELESS_RETURN_FROM_MAIN: &str = "int main(void){return 2;}";
 fn basic_return_from_main_tokenize() {
     let source = BASIC_RETURN_FROM_MAIN.to_owned();
     let stream = vec![
-        Token::TyKeyword { ty: Type::Int },
-        Token::Identifier {
+        lexer::Token::TyKeyword {
+            ty: lexer::Type::Int,
+        },
+        lexer::Token::Identifier {
             val: String::from("main"),
         },
-        Token::OpenParens,
-        Token::TyKeyword { ty: Type::Void },
-        Token::CloseParens,
-        Token::OpenBrace,
-        Token::RetKeyword,
-        Token::Constant { val: 2 },
-        Token::Semicolon,
-        Token::CloseBrace,
+        lexer::Token::OpenParens,
+        lexer::Token::TyKeyword {
+            ty: lexer::Type::Void,
+        },
+        lexer::Token::CloseParens,
+        lexer::Token::OpenBrace,
+        lexer::Token::RetKeyword,
+        lexer::Token::Constant { val: 2 },
+        lexer::Token::Semicolon,
+        lexer::Token::CloseBrace,
     ];
 
     if let Ok(tokens) = lexer::tokenize(source) {
@@ -37,12 +38,12 @@ fn basic_return_from_main_parse() {
 
     if let Ok(tokens) = lexer::tokenize(source) {
         assert_eq!(
-            parse(tokens).unwrap(),
-            AST::Program {
-                function: Box::new(AST::FunDef {
+            parser::parse(tokens).unwrap(),
+            parser::ProgramC {
+                function: Box::new(parser::FunDefC {
                     identifier: String::from("main"),
-                    statement: Box::new(AST::Statement {
-                        exp: Box::new(AST::Expression { c: 2 })
+                    statement: Box::new(parser::StatementC {
+                        exp: Box::new(parser::ExpC { c: 2 })
                     })
                 })
             }
@@ -56,18 +57,22 @@ fn basic_return_from_main_parse() {
 fn whitespaceless_return_from_main_tokenize() {
     let source = WHITESPACELESS_RETURN_FROM_MAIN.to_owned();
     let stream = vec![
-        Token::TyKeyword { ty: Type::Int },
-        Token::Identifier {
+        lexer::Token::TyKeyword {
+            ty: lexer::Type::Int,
+        },
+        lexer::Token::Identifier {
             val: String::from("main"),
         },
-        Token::OpenParens,
-        Token::TyKeyword { ty: Type::Void },
-        Token::CloseParens,
-        Token::OpenBrace,
-        Token::RetKeyword,
-        Token::Constant { val: 2 },
-        Token::Semicolon,
-        Token::CloseBrace,
+        lexer::Token::OpenParens,
+        lexer::Token::TyKeyword {
+            ty: lexer::Type::Void,
+        },
+        lexer::Token::CloseParens,
+        lexer::Token::OpenBrace,
+        lexer::Token::RetKeyword,
+        lexer::Token::Constant { val: 2 },
+        lexer::Token::Semicolon,
+        lexer::Token::CloseBrace,
     ];
 
     if let Ok(tokens) = lexer::tokenize(source) {
@@ -83,12 +88,12 @@ fn whitespaceless_return_from_main_parse() {
 
     if let Ok(tokens) = lexer::tokenize(source) {
         assert_eq!(
-            parse(tokens).unwrap(),
-            AST::Program {
-                function: Box::new(AST::FunDef {
+            parser::parse(tokens).unwrap(),
+            parser::ProgramC {
+                function: Box::new(parser::FunDefC {
                     identifier: String::from("main"),
-                    statement: Box::new(AST::Statement {
-                        exp: Box::new(AST::Expression { c: 2 })
+                    statement: Box::new(parser::StatementC {
+                        exp: Box::new(parser::ExpC { c: 2 })
                     })
                 })
             }
