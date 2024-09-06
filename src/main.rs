@@ -39,9 +39,14 @@ fn main() {
     let args = Args::parse();
 
     // driver
-    let preprocessed_file = format!("{}.i", args.file_path);
+    let stripped_extension = if args.file_path.ends_with(r".c") {
+        String::from(args.file_path.strip_suffix(r".c").unwrap())
+    } else {
+        todo!()
+    };
+    let preprocessed_file = format!("{}.i", stripped_extension);
     preprocess(&args.file_path, &preprocessed_file);
-    let assembly_file = compile(preprocessed_file, args.lex, args.parse, args.codegen).unwrap();
+    let assembly_file = compile(stripped_extension, args.lex, args.parse, args.codegen).unwrap();
     println!("(!!!) assembly_file = {}", assembly_file);
     assemble(&assembly_file);
 }

@@ -14,7 +14,7 @@ use asmgen::{emit_asm, gen_asm};
 pub enum CompileError {
     Lex { e: lexer::LexError },
     Parse { e: parser::ParseError },
-    FileRead { e: std::io::Error },
+    FileIo { e: std::io::Error },
 }
 
 impl Display for CompileError {
@@ -22,7 +22,7 @@ impl Display for CompileError {
         match self {
             Self::Lex { e } => write!(f, "{}", e),
             Self::Parse { e } => write!(f, "{}", e),
-            Self::FileRead { e } => write!(f, "{}", e),
+            Self::FileIo { e } => write!(f, "{}", e),
         }
     }
 }
@@ -34,9 +34,9 @@ impl Display for CompileError {
 /// - p: bool, stop after parsing
 /// - c: bool, stop after assembly code generation
 pub fn compile(input_file: String, l: bool, p: bool, c: bool) -> Result<String, CompileError> {
-    let source = match fs::read_to_string(input_file.clone()) {
+    let source = match fs::read_to_string(format!("{}.i", input_file)) {
         Ok(s) => s,
-        Err(e) => return Err(CompileError::FileRead { e }),
+        Err(e) => return Err(CompileError::FileIo { e }),
     };
 
     let tokens = match tokenize(source) {
@@ -66,9 +66,9 @@ pub fn compile(input_file: String, l: bool, p: bool, c: bool) -> Result<String, 
     if c {
         println!("GENERATED ASSEMBLY: {}", asm_ast);
         return Ok(String::from("Magic words"));
-    } else if let Err(e) = emit_asm(asm_ast, format!("{}.i", input_file)) {
-        return Err(todo!("determine error"));
+    } else if let Err(e) = emit_asm(asm_ast, format!("{}.s", input_file)) {
+        return Err(CompileError::FileIo { e });
     }
 
-    Ok(String::from("COMPILE RETURNED WOOHOO!!!"))
+    Ok(format!("{}.s", input_file))
 }
