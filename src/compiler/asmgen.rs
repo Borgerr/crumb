@@ -90,8 +90,7 @@ impl Display for Register {
 
 /// Converts ASM AST to syntax and writes to output file
 pub fn emit_asm(asmprog: ProgramAsm, output_file: String) -> std::io::Result<()> {
-    fs::write(output_file, format!("{}", asmprog))?;
-    Ok(())
+    fs::write(output_file, format!("{}", asmprog))
 }
 
 pub fn gen_asm(cprog: ProgramC) -> ProgramAsm {
