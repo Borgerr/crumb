@@ -39,6 +39,9 @@ pub enum Token {
     OpenBrace,                  // {
     CloseBrace,                 // }
     Semicolon,                  // ;
+    Minus,                      // -
+    MinusMinus,                 // --
+    Tilde,                      //
 }
 
 impl Display for Token {
@@ -53,6 +56,9 @@ impl Display for Token {
             Self::OpenBrace => write!(f, "{{ symbol"),
             Self::CloseBrace => write!(f, "}} symbol"),
             Self::Semicolon => write!(f, "; symbol"),
+            Self::Minus => write!(f, "- symbol"),
+            Self::MinusMinus => write!(f, "-- symbol"),
+            Self::Tilde => write!(f, "~ symbol"),
         }
     }
 }
@@ -105,6 +111,15 @@ pub fn tokenize(source: String) -> Result<Vec<Token>, LexError> {
         } else if strang.starts_with(r";") {
             strang = strang.trim_start_matches(r";");
             Token::Semicolon
+        } else if strang.starts_with(r"--") {
+            strang = strang.trim_start_matches(r"--");
+            Token::MinusMinus
+        } else if strang.starts_with(r"-") {
+            strang = strang.trim_start_matches(r"-");
+            Token::Minus
+        } else if strang.starts_with(r"~") {
+            strang = strang.trim_start_matches(r"~");
+            Token::Tilde
         } else {
             return Err(LexError::Unrecognized {
                 strang: strang.to_string(),
