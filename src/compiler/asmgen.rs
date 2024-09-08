@@ -18,7 +18,7 @@ impl Display for ProgramAsm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}\n\t.section .note.GNU-stack,\"\",@progbits",
+            "{}\n\t.section .note.GNU-stack,\"\",@progbits\n",
             *self.function
         )
     }
