@@ -46,8 +46,13 @@ fn main() {
     };
     let preprocessed_file = format!("{}.i", stripped_extension);
     preprocess(&args.file_path, &preprocessed_file);
-    let assembly_file = compile(stripped_extension, args.lex, args.parse, args.codegen).unwrap();
-    println!("(!!!) assembly_file = {}", assembly_file);
+    let assembly_file = match compile(stripped_extension, args.lex, args.parse, args.codegen) {
+        Ok(strang) => strang,
+        Err(e) => {
+            println!("{}", e);
+            return;
+        }
+    };
     assemble(&assembly_file);
 }
 
@@ -67,11 +72,15 @@ fn preprocess(input_file: &String, preprocessed_file: &String) {
             .expect("failed to execute preprocesser")
     };
 
-    println!(
-        "(-) Preprocessing complete\n\n(-) stdout:\n{}\n\n(-) stderr:\n{}\n\n",
-        str::from_utf8(&output.stdout).expect("Invalid UTF-8 sequence"),
-        str::from_utf8(&output.stderr).expect("Invalid UTF-8 sequence")
-    )
+    let out = str::from_utf8(&output.stdout).expect("Invalid UTF-8 sequence");
+    let err = str::from_utf8(&output.stderr).expect("Invalid UTF-8 sequence");
+
+    if !out.is_empty() {
+        println!("PREPROCESS STDOUT: {}", out);
+    }
+    if !err.is_empty() {
+        println!("PREPROCESS STDERR: {}", err);
+    }
 }
 
 /// Assemble the C file
@@ -92,9 +101,13 @@ fn assemble(input_file: &String) {
             .expect("failed to execute preprocesser")
     };
 
-    println!(
-        "(-) Preprocessing complete\n\n(-) stdout:\n{}\n\n(-) stderr:\n{}\n\n",
-        str::from_utf8(&output.stdout).expect("Invalid UTF-8 sequence"),
-        str::from_utf8(&output.stderr).expect("Invalid UTF-8 sequence")
-    )
+    let out = str::from_utf8(&output.stdout).expect("Invalid UTF-8 sequence");
+    let err = str::from_utf8(&output.stderr).expect("Invalid UTF-8 sequence");
+
+    if !out.is_empty() {
+        println!("ASSEMBLE STDOUT: {}", out);
+    }
+    if !err.is_empty() {
+        println!("ASSEMBLE STDERR: {}", err);
+    }
 }
