@@ -30,22 +30,28 @@ impl Display for ParseError {
     }
 }
 
-/* ABSTRACT GRAMMAR: (as of v0.1.0)
+/* ABSTRACT GRAMMAR: (as of v0.1.1)
  * program = Program(function_definition)
  * function_definition = Function(identifier name, statement)
  * statement = Return(exp)
- * exp = Constant(int)
+ * exp = Constant(int) | Unary(unary_operator, exp)
+ * unary_operator = Complement | Negate
 */
 
-/* FORMAL GRAMMAR: (as of v0.1.0)
+/* FORMAL GRAMMAR: (as of v0.1.1)
  * <program> ::= <function>
  * <function> ::= "int" <identifier> "(" "void" ")" "{" <statement> "}"
  * <statement> ::= "return" <exp> ";"
- * <exp> ::= <int>
+ * <exp> ::= <int> | <unop> <exp> | "(" <exp> ")"
  * <identifier> ? An identifier token ?
  * <int> ? A constant token ?
 */
 
+/// Abstract C program
+/// ### Abstract grammar as of v0.1.0
+/// `program = Program(function_definition)`
+/// ### Concrete grammar as of v0.1.0
+/// `<program> ::= <function>`
 #[derive(PartialEq, Debug)]
 pub struct ProgramC {
     pub function: Box<FunDefC>,
@@ -57,6 +63,11 @@ impl Display for ProgramC {
     }
 }
 
+/// Abstract C function definition
+/// ### Abstract grammar as of v0.1.0
+/// `function_definition = Function(identifier name, statement)`
+/// ### Concrete grammar as of v0.1.0
+/// `<function> ::= "int" <identifier> "(" "void" ")" "{" <statement> "}"`
 #[derive(PartialEq, Debug)]
 pub struct FunDefC {
     pub identifier: String,
@@ -73,6 +84,11 @@ impl Display for FunDefC {
     }
 }
 
+/// Abstract C statement
+/// ### Abstract grammar as of v0.1.0
+/// `statement = Return(exp)`
+/// ### Concrete grammar as of v0.1.0
+/// `<statement> ::= "return" <exp> ";"`
 #[derive(PartialEq, Debug)]
 pub enum StatementC {
     Return { exp: Box<ExpC> },
@@ -86,15 +102,40 @@ impl Display for StatementC {
     }
 }
 
+/// Abstract C expression
+/// ### Abstract grammar as of v0.1.1
+/// `exp = Constant(int) | Unary(unary_operator, exp)`
+/// ### Concrete grammar as of v0.1.1
+/// `<exp> ::= <int> | <unop> <exp> | "(" <exp> ")"`
 #[derive(PartialEq, Debug)]
 pub enum ExpC {
     Const { c: i32 },
+    Unary { op: UnaryOp, exp: Box<ExpC> },
 }
 
 impl Display for ExpC {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Const { c } => write!(f, "ExpC with c = {}", c),
+            Self::Const { c } => write!(f, "ExpC::Const with c = {}", c),
+            Self::Unary { op, exp } => write!(f, "ExpC::Unary with op = {}, exp = {}", op, *exp),
+        }
+    }
+}
+
+/// Abstract C unary operation.
+/// - `~`: bitwise complement
+/// - `-`: integer negation
+#[derive(PartialEq, Debug)]
+pub enum UnaryOp {
+    Negate,
+    BitwiseComplement,
+}
+
+impl Display for UnaryOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Negate => write!(f, "UnaryOp::Negate"),
+            Self::BitwiseComplement => write!(f, "UnaryOp::BitwiseComplement"),
         }
     }
 }
@@ -167,13 +208,32 @@ fn parse_statement(tokens: &mut IntoIter<Token>) -> Result<StatementC, ParseErro
 /// `<exp> ::= <int>`
 fn parse_exp(tokens: &mut IntoIter<Token>) -> Result<ExpC, ParseError> {
     let got = expect_token(tokens)?;
-    if let Token::Constant { val } = got {
-        Ok(ExpC::Const { c: val })
-    } else {
-        Err(ParseError::InvalidSyntax {
+    match got {
+        Token::Constant { val } => Ok(ExpC::Const { c: val }),
+        Token::Tilde => Ok(ExpC::Unary {
+            op: UnaryOp::BitwiseComplement,
+            exp: Box::new(parse_exp(tokens)?),
+        }),
+        Token::Minus => Ok(ExpC::Unary {
+            op: UnaryOp::Negate,
+            exp: Box::new(parse_exp(tokens)?),
+        }),
+        Token::OpenParens => {
+            let inner_exp = parse_exp(tokens)?;
+            let got = expect_token(tokens)?;
+            if let Token::CloseParens = got {
+                Ok(inner_exp)
+            } else {
+                Err(ParseError::InvalidSyntax {
+                    got,
+                    expected: Token::CloseParens,
+                })
+            }
+        }
+        _ => Err(ParseError::InvalidSyntax {
             got,
             expected: Token::Constant { val: 42 },
-        })
+        }),
     }
 }
 
