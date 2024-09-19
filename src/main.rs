@@ -8,7 +8,7 @@ use compiler::compile;
 mod test;
 
 #[derive(Parser, Debug)]
-#[command(version("0.1.0"), about = "A C compiler", long_about = None)]
+#[command(version("0.1.1"), about = "A C compiler for x86-64 Linux", long_about = None)]
 struct Args {
     #[arg(help = "Path to the file to compile")]
     file_path: String,
@@ -42,7 +42,8 @@ fn main() {
     let stripped_extension = if args.file_path.ends_with(r".c") {
         String::from(args.file_path.strip_suffix(r".c").unwrap())
     } else {
-        todo!()
+        println!("(!) {} is not a c file", args.file_path);
+        return;
     };
     let preprocessed_file = format!("{}.i", stripped_extension);
     preprocess(&args.file_path, &preprocessed_file);
