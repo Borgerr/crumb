@@ -125,7 +125,7 @@ impl Display for ExpC {
 /// Abstract C unary operation.
 /// - `~`: bitwise complement
 /// - `-`: integer negation
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum UnaryOp {
     Negate,
     BitwiseComplement,

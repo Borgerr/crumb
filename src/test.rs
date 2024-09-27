@@ -1,7 +1,4 @@
-use crate::compiler::{
-    asmgen::{self, FunDefAsm, InstructionAsm, ProgramAsm},
-    lexer, parser,
-};
+use crate::compiler::{asmgen, lexer, parser, tacky};
 
 static BASIC_RETURN_FROM_MAIN: &str = "int main(void) { return 2; }";
 static WHITESPACELESS_RETURN_FROM_MAIN: &str = "int main(void){return 2;}";
@@ -61,10 +58,10 @@ fn basic_return_from_main_asmgen() {
     let source = BASIC_RETURN_FROM_MAIN.to_owned();
 
     assert_eq!(
-        asmgen::gen_asm(
+        asmgen::gen_asm(tacky::TackyEmitter::gen_tacky(
             parser::parse(lexer::tokenize(source).expect("expected valid stream of tokens"))
                 .expect("expected valid parsing of tokens")
-        ),
+        )),
         asmgen::ProgramAsm {
             function: Box::new(asmgen::FunDefAsm {
                 identifier: String::from("main"),
@@ -72,7 +69,7 @@ fn basic_return_from_main_asmgen() {
                     asmgen::InstructionAsm::Mov {
                         src: asmgen::OperandAsm::Imm { int: 2 },
                         dst: asmgen::OperandAsm::Reg {
-                            r: asmgen::Register::EAX
+                            r: asmgen::Register::AX
                         },
                     },
                     asmgen::InstructionAsm::Ret
@@ -137,10 +134,10 @@ fn whitespaceless_return_from_main_asmgen() {
     let source = WHITESPACELESS_RETURN_FROM_MAIN.to_owned();
 
     assert_eq!(
-        asmgen::gen_asm(
+        asmgen::gen_asm(tacky::TackyEmitter::gen_tacky(
             parser::parse(lexer::tokenize(source).expect("expected valid stream of tokens"))
                 .expect("expected valid parsing of tokens")
-        ),
+        )),
         asmgen::ProgramAsm {
             function: Box::new(asmgen::FunDefAsm {
                 identifier: String::from("main"),
@@ -148,7 +145,7 @@ fn whitespaceless_return_from_main_asmgen() {
                     asmgen::InstructionAsm::Mov {
                         src: asmgen::OperandAsm::Imm { int: 2 },
                         dst: asmgen::OperandAsm::Reg {
-                            r: asmgen::Register::EAX
+                            r: asmgen::Register::AX
                         },
                     },
                     asmgen::InstructionAsm::Ret

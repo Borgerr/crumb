@@ -33,6 +33,13 @@ struct Args {
         help = "Directs compiler to perform lexing, parsing, and assembly generation, but stop before code emission"
     )]
     codegen: bool,
+    #[clap(
+        long,
+        short,
+        action,
+        help = "Directs compiler to perform lexing, parsing, and tacky, but stop before code emission"
+    )]
+    tacky: bool,
 }
 
 fn main() {
@@ -47,7 +54,7 @@ fn main() {
     };
     let preprocessed_file = format!("{}.i", stripped_extension);
     preprocess(&args.file_path, &preprocessed_file);
-    let assembly_file = match compile(stripped_extension, args.lex, args.parse, args.codegen) {
+    let assembly_file = match compile(stripped_extension, args) {
         Ok(strang) => strang,
         Err(e) => {
             println!("{}", e);
