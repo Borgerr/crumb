@@ -35,14 +35,20 @@ pub struct FunDefAsm {
 
 impl Display for FunDefAsm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "\t.globl {}\n{}:{}", self.identifier, self.identifier, {
-            let mut format_instrs = String::from("");
-            self.instructions
-                .clone()
-                .into_iter()
-                .for_each(|i| format_instrs.push_str(&format!("\n\t{}", i)));
-            format_instrs
-        })
+        write!(
+            f,
+            "\t.globl {}\n{}:\n\tpushq %rbp\n\tmovq %rsp, %rbp{}", // including prologue
+            self.identifier,
+            self.identifier,
+            {
+                let mut format_instrs = String::from("");
+                self.instructions
+                    .clone()
+                    .into_iter()
+                    .for_each(|i| format_instrs.push_str(&format!("\n\t{}", i)));
+                format_instrs
+            }
+        )
     }
 }
 
@@ -66,12 +72,12 @@ impl Display for InstructionAsm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Mov { src, dst } => write!(f, "movl {}, {}", src, dst),
-            Self::Ret => write!(f, "ret"),
+            Self::Ret => write!(f, "movq %rbp, %rsp\n\tpopq %rbp\n\tret"), // including epilogue
             Self::Unary { unop, operand } => match unop {
                 UnaryOp::Negate => write!(f, "negl {}", operand),
                 UnaryOp::BitwiseComplement => write!(f, "notl {}", operand),
             },
-            Self::AllocStack { off } => write!(f, "subq ${}, $rsp", off),
+            Self::AllocStack { off } => write!(f, "subq ${}, %rsp", -1 * off),
         }
     }
 }
@@ -113,7 +119,7 @@ pub enum Register {
 impl Display for Register {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::AX => write!(f, "%ax"),
+            Self::AX => write!(f, "%eax"),
             Self::R10 => write!(f, "%r10d"),
         }
     }
@@ -216,8 +222,8 @@ impl TmpVarResolver {
                 None => {
                     self.min_used = self.min;
                     self.min -= 4;
-                    self.id_to_off.insert(id, self.min);
-                    OperandAsm::Stack { off: self.min }
+                    self.id_to_off.insert(id, self.min_used);
+                    OperandAsm::Stack { off: self.min_used }
                 }
             },
             _ => op,
