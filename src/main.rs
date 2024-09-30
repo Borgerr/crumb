@@ -40,10 +40,18 @@ struct Args {
         help = "Directs compiler to perform lexing, parsing, and tacky, but stop before code emission"
     )]
     tacky: bool,
+    #[clap(
+        long,
+        short,
+        action,
+        help = "Directs for binary to be placed adjacent in current directory"
+    )]
+    incd: bool,
 }
 
 fn main() {
     let args = Args::parse();
+    let incd = args.incd; // will be moving
 
     // driver
     let stripped_extension = if args.file_path.ends_with(r".c") {
@@ -61,13 +69,13 @@ fn main() {
             return;
         }
     };
-    assemble(&assembly_file);
+    assemble(&assembly_file, incd);
 }
 
 /// preprocesses the C file
 /// kind of cheating, but we're only writing a compiler, not a preprocessor,
 /// at least for now.
-fn preprocess(input_file: &String, preprocessed_file: &String) {
+pub fn preprocess(input_file: &String, preprocessed_file: &String) {
     let output = if cfg!(target_os = "windows") {
         todo!("This compiler currently targets x64 Linux. Make a PR or an issue if you want a different target.")
     } else {
@@ -94,12 +102,21 @@ fn preprocess(input_file: &String, preprocessed_file: &String) {
 /// Assemble the C file
 /// kind of cheating, but we're only writing a compiler, not a preprocessor,
 /// at least for now.
-fn assemble(input_file: &String) {
-    let output_file = Path::new(input_file)
-        .file_stem()
-        .expect("Invalid path")
-        .to_str()
-        .expect("Invalid UTF-8 sequence");
+pub fn assemble(input_file: &String, incd: bool) {
+    println!("(!) ASSEMBLE input_file = {}", input_file);
+    let output_file = if incd {
+        Path::new(input_file)
+            .file_stem()
+            .expect("Invalid path")
+            .to_str()
+            .expect("Invalid UTF-8 sequence")
+    } else {
+        Path::new(input_file)
+            .to_str()
+            .expect("Invalid path")
+            .strip_suffix(r".s")
+            .unwrap()
+    };
     let output = if cfg!(target_os = "windows") {
         todo!("This compiler currently targets x64 Linux. Make a PR or an issue if you want a different target.")
     } else {
