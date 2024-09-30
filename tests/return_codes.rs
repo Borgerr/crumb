@@ -36,13 +36,26 @@ macro_rules! basic_mainret {
     };
 }
 
-basic_mainret!(return_basic_neg_mainret, "-2", -2);
-basic_mainret!(return_basic_cmp_mainret, "~2", !2);
-basic_mainret!(return_negneg_mainret, "-(-2)", -(-2));
-basic_mainret!(return_cmpcmp_mainret, "~(~2)", !(!2));
-basic_mainret!(return_cmpneg_mainret, "~(-2)", !(-2));
-basic_mainret!(return_triplecmp_mainret, "~(~(~2))", !(!(!2)));
-basic_mainret!(return_tripleneg_mainret, "-(-(-2))", -(-(-2)));
-basic_mainret!(return_negcmpneg_mainret, "-(~(-2))", -(!(-2)));
-basic_mainret!(return_quadneg_mainret, "-(-(-(-2)))", -(-(-(-2))));
-basic_mainret!(return_quadcmp_mainret, "~(~(~(~2)))", !(!(!(!2))));
+basic_mainret!(return_basic_neg_two, "-2", -2);
+basic_mainret!(return_basic_cmp_two, "~2", !2);
+basic_mainret!(return_negneg_two, "-(-2)", -(-2));
+basic_mainret!(return_cmpcmp_two, "~(~2)", !(!2));
+basic_mainret!(return_cmpneg_two, "~(-2)", !(-2));
+basic_mainret!(return_triplecmp_two, "~(~(~2))", !(!(!2)));
+basic_mainret!(return_tripleneg_two, "-(-(-2))", -(-(-2)));
+basic_mainret!(return_negcmpneg_two, "-(~(-2))", -(!(-2)));
+basic_mainret!(return_quadneg_two, "-(-(-(-2)))", -(-(-(-2))));
+basic_mainret!(return_quadcmp_two, "~(~(~(~2)))", !(!(!(!2))));
+basic_mainret!(return_cmpnegcmpneg_two, "~(-(~(-2)))", !(-(!(-2))));
+
+basic_mainret!(return_basic_neg_three, "-3", -3);
+basic_mainret!(return_basic_cmp_three, "~3", !3);
+basic_mainret!(return_negneg_three, "-(-3)", -(-3));
+basic_mainret!(return_cmpcmp_three, "~(~3)", !(!3));
+basic_mainret!(return_cmpneg_three, "~(-3)", !(-3));
+basic_mainret!(return_triplecmp_three, "~(~(~3))", !(!(!3)));
+basic_mainret!(return_tripleneg_three, "-(-(-3))", -(-(-3)));
+basic_mainret!(return_negcmpneg_three, "-(~(-3))", -(!(-3)));
+basic_mainret!(return_quadneg_three, "-(-(-(-3)))", -(-(-(-3))));
+basic_mainret!(return_quadcmp_three, "~(~(~(~3)))", !(!(!(!3))));
+basic_mainret!(return_cmpnegcmpneg_three, "~(-(~(-3)))", !(-(!(-3))));
