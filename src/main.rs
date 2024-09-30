@@ -103,7 +103,6 @@ pub fn preprocess(input_file: &String, preprocessed_file: &String) {
 /// kind of cheating, but we're only writing a compiler, not a preprocessor,
 /// at least for now.
 pub fn assemble(input_file: &String, incd: bool) {
-    println!("(!) ASSEMBLE input_file = {}", input_file);
     let output_file = if incd {
         Path::new(input_file)
             .file_stem()

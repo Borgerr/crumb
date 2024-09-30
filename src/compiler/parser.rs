@@ -278,5 +278,59 @@ fn test_variant_error() {
 fn test_variant_success() {
     let mut tokens = vec![Token::OpenBrace].into_iter();
     let res = expect_variant(&mut tokens, Token::OpenBrace);
-    assert!(if let Ok(_) = res { true } else { false });
+    assert!(res.is_ok());
+}
+
+/// tests the parsing of ~(~(~2))
+#[test]
+fn test_nested_cmp_parens() {
+    let mut tokens = vec![
+        Token::Tilde,
+        Token::OpenParens,
+        Token::Tilde,
+        Token::OpenParens,
+        Token::Tilde,
+        Token::Constant { val: 2 },
+        Token::CloseParens,
+        Token::CloseParens,
+    ]
+    .into_iter();
+    let res = parse_exp(&mut tokens);
+    assert!(res.is_ok());
+}
+
+#[test]
+fn test_nested_parens() {
+    let mut tokens = vec![
+        Token::OpenParens,
+        Token::OpenParens,
+        Token::OpenParens,
+        Token::Constant { val: 2 },
+        Token::CloseParens,
+        Token::CloseParens,
+        Token::CloseParens,
+    ]
+    .into_iter();
+    let res = parse_exp(&mut tokens);
+    assert!(res.is_ok());
+}
+
+/// tests the parsing of `return ~(~(~2));`
+#[test]
+fn test_return_nested_parens() {
+    let mut tokens = vec![
+        Token::RetKeyword,
+        Token::Tilde,
+        Token::OpenParens,
+        Token::Tilde,
+        Token::OpenParens,
+        Token::Tilde,
+        Token::Constant { val: 2 },
+        Token::CloseParens,
+        Token::CloseParens,
+        Token::Semicolon,
+    ]
+    .into_iter();
+    let res = parse_statement(&mut tokens);
+    assert!(res.is_ok());
 }

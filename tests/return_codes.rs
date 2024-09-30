@@ -1,5 +1,5 @@
 use assert_cmd::Command;
-use std::io::Write;
+use std::{io::Write, str};
 use tempfile::{NamedTempFile, TempDir};
 
 fn return_exitcode(source: &str) -> i32 {
@@ -8,11 +8,14 @@ fn return_exitcode(source: &str) -> i32 {
     write!(tmpsource, "{}", source).unwrap();
     let source_name = tmpsource.path().to_str().unwrap();
 
-    let compile_res = Command::cargo_bin(env!("CARGO_PKG_NAME"))
+    let compile_res_vec = Command::cargo_bin(env!("CARGO_PKG_NAME"))
         .unwrap()
         .arg(source_name)
-        .ok();
-    assert!(compile_res.is_ok());
+        .ok()
+        .unwrap()
+        .stdout;
+    let compile_res_str = str::from_utf8(&compile_res_vec).unwrap();
+    assert!(!compile_res_str.starts_with("(!)"));
 
     let binary_name = source_name.strip_suffix(r".c").unwrap();
 
@@ -41,3 +44,5 @@ basic_mainret!(return_cmpneg_mainret, "~(-2)", !(-2));
 basic_mainret!(return_triplecmp_mainret, "~(~(~2))", !(!(!2)));
 basic_mainret!(return_tripleneg_mainret, "-(-(-2))", -(-(-2)));
 basic_mainret!(return_negcmpneg_mainret, "-(~(-2))", -(!(-2)));
+basic_mainret!(return_quadneg_mainret, "-(-(-(-2)))", -(-(-(-2))));
+basic_mainret!(return_quadcmp_mainret, "~(~(~(~2)))", !(!(!(!2))));

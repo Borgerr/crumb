@@ -97,28 +97,28 @@ pub fn tokenize(source: String) -> Result<Vec<Token>, LexError> {
                 val: mat.as_str().parse().unwrap(),
             }
         } else if strang.starts_with(r"(") {
-            strang = strang.trim_start_matches(r"(");
+            strang = strang.strip_prefix(r"(").unwrap();
             Token::OpenParens
         } else if strang.starts_with(r")") {
-            strang = strang.trim_start_matches(r")");
+            strang = strang.strip_prefix(r")").unwrap();
             Token::CloseParens
         } else if strang.starts_with(r"{") {
-            strang = strang.trim_start_matches(r"{");
+            strang = strang.strip_prefix(r"{").unwrap();
             Token::OpenBrace
         } else if strang.starts_with(r"}") {
-            strang = strang.trim_start_matches(r"}");
+            strang = strang.strip_prefix(r"}").unwrap();
             Token::CloseBrace
         } else if strang.starts_with(r";") {
-            strang = strang.trim_start_matches(r";");
+            strang = strang.strip_prefix(r";").unwrap();
             Token::Semicolon
         } else if strang.starts_with(r"--") {
-            strang = strang.trim_start_matches(r"--");
+            strang = strang.strip_prefix(r"--").unwrap();
             Token::MinusMinus
         } else if strang.starts_with(r"-") {
-            strang = strang.trim_start_matches(r"-");
+            strang = strang.strip_prefix(r"-").unwrap();
             Token::Minus
         } else if strang.starts_with(r"~") {
-            strang = strang.trim_start_matches(r"~");
+            strang = strang.strip_prefix(r"~").unwrap();
             Token::Tilde
         } else {
             return Err(LexError::Unrecognized {
@@ -139,4 +139,32 @@ fn check_for_keywords(strang: &str) -> Token {
             val: String::from(strang),
         },
     }
+}
+
+#[test]
+fn test_lex_nested_cmp() {
+    let source = String::from("int main(void) { return ~(~(~2)); }");
+    let tokens = tokenize(source).unwrap();
+    let expected = vec![
+        Token::TyKeyword { ty: Type::Int },
+        Token::Identifier {
+            val: String::from("main"),
+        },
+        Token::OpenParens,
+        Token::TyKeyword { ty: Type::Void },
+        Token::CloseParens,
+        Token::OpenBrace,
+        Token::RetKeyword,
+        Token::Tilde,
+        Token::OpenParens,
+        Token::Tilde,
+        Token::OpenParens,
+        Token::Tilde,
+        Token::Constant { val: 2 },
+        Token::CloseParens,
+        Token::CloseParens,
+        Token::Semicolon,
+        Token::CloseBrace,
+    ];
+    assert_eq!(tokens, expected);
 }
