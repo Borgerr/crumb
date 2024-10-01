@@ -41,7 +41,11 @@ pub enum Token {
     Semicolon,                  // ;
     Minus,                      // -
     MinusMinus,                 // --
-    Tilde,                      //
+    Tilde,                      // ~
+    Plus,                       // +
+    Asterisk,                   // *
+    FSlash,                     // /
+    Percent,                    // %
 }
 
 impl Display for Token {
@@ -59,6 +63,10 @@ impl Display for Token {
             Self::Minus => write!(f, "- symbol"),
             Self::MinusMinus => write!(f, "-- symbol"),
             Self::Tilde => write!(f, "~ symbol"),
+            Self::Plus => write!(f, "+ symbol"),
+            Self::Asterisk => write!(f, "* symbol"),
+            Self::FSlash => write!(f, "/ symbol"),
+            Self::Percent => write!(f, "% symbol"),
         }
     }
 }
@@ -120,6 +128,18 @@ pub fn tokenize(source: String) -> Result<Vec<Token>, LexError> {
         } else if strang.starts_with(r"~") {
             strang = strang.strip_prefix(r"~").unwrap();
             Token::Tilde
+        } else if strang.starts_with(r"+") {
+            strang = strang.strip_prefix(r"+").unwrap();
+            Token::Plus
+        } else if strang.starts_with(r"*") {
+            strang = strang.strip_prefix(r"*").unwrap();
+            Token::Asterisk
+        } else if strang.starts_with(r"/") {
+            strang = strang.strip_prefix(r"/").unwrap();
+            Token::FSlash
+        } else if strang.starts_with(r"%") {
+            strang = strang.strip_prefix(r"%").unwrap();
+            Token::Percent
         } else {
             return Err(LexError::Unrecognized {
                 strang: strang.to_string(),
