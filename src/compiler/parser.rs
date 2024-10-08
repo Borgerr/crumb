@@ -123,6 +123,18 @@ impl Display for ExpC {
     }
 }
 
+/// Factor. Same ADT type as an expression, but allows for mutual recursion and precedence climbing.
+/// ### Formal Grammar as of v0.1.2
+/// ```text
+/// <factor> ::= <int> | <unop> <factor> | "(" <exp> ")"
+/// ```
+#[derive(PartialEq, Debug)]
+pub enum FactorC {
+    Const { c: i32 },
+    Unary { op: UnaryOp, fac: Box<FactorC> },
+    Exp { exp: Box<ExpC> },
+}
+
 /// Abstract C unary operation.
 /// - `~`: bitwise complement
 /// - `-`: integer negation
