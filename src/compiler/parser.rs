@@ -100,25 +100,56 @@ impl Display for StatementC {
 }
 
 /// Abstract C expression
-/// ### Abstract grammar as of v0.1.1
+/// ### Abstract grammar as of v0.1.2
 /// ```text
-/// exp = Constant(int) | Unary(unary_operator, exp)
+/// exp = Factor(factor) | Binary(binary_operator, l_exp, r_exp)
 /// ```
-/// ### Concrete grammar as of v0.1.1
+/// ### Concrete grammar as of v0.1.2
 /// ```text
-/// <exp> ::= <int> | <unop> <exp> | "(" <exp> ")"
+/// <exp> ::= <factor> | <exp> <binop> <exp>
 /// ```
 #[derive(PartialEq, Debug)]
 pub enum ExpC {
-    Const { c: i32 },
-    Unary { op: UnaryOp, exp: Box<ExpC> },
+    Factor {
+        fac: Box<FactorC>,
+    },
+    Binary {
+        op: BinaryOp,
+        l_exp: Box<ExpC>,
+        r_exp: Box<ExpC>,
+    },
 }
 
 impl Display for ExpC {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Const { c } => write!(f, "ExpC::Const with c = {}", c),
-            Self::Unary { op, exp } => write!(f, "ExpC::Unary with op = {}, exp = {}", op, *exp),
+            Self::Factor { fac } => write!(f, "Factor expression with inner fac = {}", *fac),
+            Self::Binary { op, l_exp, r_exp } => write!(
+                f,
+                "Binary expression with binop = {}, l_exp = {}, r_exp = {}",
+                op, *l_exp, *r_exp
+            ),
+        }
+    }
+}
+
+#[derive(PartialEq, Debug)]
+pub enum BinaryOp {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Remainder,
+}
+
+impl Display for BinaryOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Add => write!(f, "Add"),
+            Self::Subtract => write!(f, "Subtract"),
+            Self::Multiply => write!(f, "Multiply"),
+            Self::Divide => write!(f, "Divide"),
+            Self::Remainder => write!(f, "Remainder"),
         }
     }
 }
@@ -133,6 +164,16 @@ pub enum FactorC {
     Const { c: i32 },
     Unary { op: UnaryOp, fac: Box<FactorC> },
     Exp { exp: Box<ExpC> },
+}
+
+impl Display for FactorC {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Const { c } => write!(f, "constant factor with c = {}", c),
+            Self::Unary { op, fac } => write!(f, "unary factor with unop = {}, fac = {}", op, *fac),
+            Self::Exp { exp } => write!(f, "expression factor with exp = {}", *exp),
+        }
+    }
 }
 
 /// Abstract C unary operation.
@@ -214,29 +255,23 @@ fn parse_statement(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<Stat
 /// Expects an expression.
 /// If this isn't found, returns an error.
 fn parse_exp(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<ExpC> {
+    Ok(ExpC::Factor {
+        fac: Box::new(parse_factor(tokens)?),
+    })
+}
+
+fn parse_factor(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<FactorC> {
     let got = expect_token(tokens)?;
     match got {
-        Token::Constant { val } => Ok(ExpC::Const { c: val }),
-        Token::Tilde => Ok(ExpC::Unary {
+        Token::Constant { val } => Ok(FactorC::Const { c: val }),
+        Token::Tilde => Ok(FactorC::Unary {
             op: UnaryOp::BitwiseComplement,
-            exp: Box::new(parse_exp(tokens)?),
+            fac: Box::new(parse_factor(tokens)?),
         }),
-        Token::Minus => Ok(ExpC::Unary {
+        Token::Minus => Ok(FactorC::Unary {
             op: UnaryOp::Negate,
-            exp: Box::new(parse_exp(tokens)?),
+            fac: Box::new(parse_factor(tokens)?),
         }),
-        Token::OpenParens => {
-            let inner_exp = parse_exp(tokens)?;
-            let got = expect_token(tokens)?;
-            if let Token::CloseParens = got {
-                Ok(inner_exp)
-            } else {
-                Err(ParseError::InvalidSyntax {
-                    got,
-                    expected: Token::CloseParens,
-                })
-            }
-        }
         _ => Err(ParseError::InvalidSyntax {
             got,
             expected: Token::Constant { val: 42 },
