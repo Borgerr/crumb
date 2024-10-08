@@ -11,6 +11,8 @@ pub enum ParseError {
     InvalidSyntax { got: Token, expected: Token },
 }
 
+type ParseResult<T> = Result<T, ParseError>;
+
 impl Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -30,28 +32,15 @@ impl Display for ParseError {
     }
 }
 
-/* ABSTRACT GRAMMAR: (as of v0.1.1)
- * program = Program(function_definition)
- * function_definition = Function(identifier name, statement)
- * statement = Return(exp)
- * exp = Constant(int) | Unary(unary_operator, exp)
- * unary_operator = Complement | Negate
-*/
-
-/* FORMAL GRAMMAR: (as of v0.1.1)
- * <program> ::= <function>
- * <function> ::= "int" <identifier> "(" "void" ")" "{" <statement> "}"
- * <statement> ::= "return" <exp> ";"
- * <exp> ::= <int> | <unop> <exp> | "(" <exp> ")"
- * <identifier> ? An identifier token ?
- * <int> ? A constant token ?
-*/
-
 /// Abstract C program
 /// ### Abstract grammar as of v0.1.0
-/// `program = Program(function_definition)`
+/// ```text
+/// program = Program(function_definition)
+/// ```
 /// ### Concrete grammar as of v0.1.0
-/// `<program> ::= <function>`
+/// ```text
+/// <program> ::= <function>
+/// ```
 #[derive(PartialEq, Debug)]
 pub struct ProgramC {
     pub function: Box<FunDefC>,
@@ -65,9 +54,13 @@ impl Display for ProgramC {
 
 /// Abstract C function definition
 /// ### Abstract grammar as of v0.1.0
-/// `function_definition = Function(identifier name, statement)`
+/// ```text
+/// function_definition = Function(identifier name, statement)
+/// ```
 /// ### Concrete grammar as of v0.1.0
-/// `<function> ::= "int" <identifier> "(" "void" ")" "{" <statement> "}"`
+/// ```text
+/// <function> ::= "int" <identifier> "(" "void" ")" "{" <statement> "}"
+/// ```
 #[derive(PartialEq, Debug)]
 pub struct FunDefC {
     pub identifier: String,
@@ -86,9 +79,13 @@ impl Display for FunDefC {
 
 /// Abstract C statement
 /// ### Abstract grammar as of v0.1.0
-/// `statement = Return(exp)`
+/// ```text
+/// statement = Return(exp)
+/// ```
 /// ### Concrete grammar as of v0.1.0
-/// `<statement> ::= "return" <exp> ";"`
+/// ```text
+/// <statement> ::= "return" <exp> ";"
+/// ```
 #[derive(PartialEq, Debug)]
 pub enum StatementC {
     Return { exp: Box<ExpC> },
@@ -104,9 +101,13 @@ impl Display for StatementC {
 
 /// Abstract C expression
 /// ### Abstract grammar as of v0.1.1
-/// `exp = Constant(int) | Unary(unary_operator, exp)`
+/// ```text
+/// exp = Constant(int) | Unary(unary_operator, exp)
+/// ```
 /// ### Concrete grammar as of v0.1.1
-/// `<exp> ::= <int> | <unop> <exp> | "(" <exp> ")"`
+/// ```text
+/// <exp> ::= <int> | <unop> <exp> | "(" <exp> ")"
+/// ```
 #[derive(PartialEq, Debug)]
 pub enum ExpC {
     Const { c: i32 },
@@ -142,7 +143,7 @@ impl Display for UnaryOp {
 
 /// Big scary parse function.
 /// As of v0.1.0, a thin wrapper over parse_fundef.
-pub fn parse(tokens: Vec<Token>) -> Result<ProgramC, ParseError> {
+pub fn parse(tokens: Vec<Token>) -> ParseResult<ProgramC> {
     Ok(ProgramC {
         function: Box::new(parse_fundef(&mut tokens.into_iter())?),
     })
@@ -150,9 +151,7 @@ pub fn parse(tokens: Vec<Token>) -> Result<ProgramC, ParseError> {
 
 /// Expects a function definition.
 /// If this isn't found, returns an error.
-/// ### v0.1.0 function definition grammar
-/// `<function> ::= "int" <identifier> "(" "void" ")" "{" <statement> "}"`
-fn parse_fundef(tokens: &mut IntoIter<Token>) -> Result<FunDefC, ParseError> {
+fn parse_fundef(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<FunDefC> {
     if expect_token(tokens)? != (Token::TyKeyword { ty: Type::Int }) {
         return Err(ParseError::FundefError {
             reason: String::from(
@@ -191,9 +190,7 @@ fn parse_fundef(tokens: &mut IntoIter<Token>) -> Result<FunDefC, ParseError> {
 
 /// Expects a statement.
 /// If this isn't found, returns an error.
-/// ### v0.1.0 statement grammar
-/// `<statement> ::= "return" <exp> ";"`
-fn parse_statement(tokens: &mut IntoIter<Token>) -> Result<StatementC, ParseError> {
+fn parse_statement(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<StatementC> {
     expect_variant(tokens, Token::RetKeyword)?;
     let ret = Ok(StatementC::Return {
         exp: Box::new(parse_exp(tokens)?),
@@ -204,9 +201,7 @@ fn parse_statement(tokens: &mut IntoIter<Token>) -> Result<StatementC, ParseErro
 
 /// Expects an expression.
 /// If this isn't found, returns an error.
-/// ### v0.1.0 exp grammar
-/// `<exp> ::= <int>`
-fn parse_exp(tokens: &mut IntoIter<Token>) -> Result<ExpC, ParseError> {
+fn parse_exp(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<ExpC> {
     let got = expect_token(tokens)?;
     match got {
         Token::Constant { val } => Ok(ExpC::Const { c: val }),
@@ -237,14 +232,14 @@ fn parse_exp(tokens: &mut IntoIter<Token>) -> Result<ExpC, ParseError> {
     }
 }
 
-fn expect_token(tokens: &mut IntoIter<Token>) -> Result<Token, ParseError> {
+fn expect_token(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<Token> {
     match tokens.next() {
         Some(token) => Ok(token),
         None => Err(ParseError::SeverredStream),
     }
 }
 
-fn expect_variant(tokens: &mut IntoIter<Token>, expected: Token) -> Result<(), ParseError> {
+fn expect_variant(tokens: &mut impl Iterator<Item = Token>, expected: Token) -> ParseResult<()> {
     let token = expect_token(tokens)?;
 
     if token == expected {
