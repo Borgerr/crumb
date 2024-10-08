@@ -77,13 +77,13 @@ impl TackyEmitter {
 
     fn translate_expression(
         &mut self,
-        cexp: ExpC,
+        cexp: Exp,
         instrs: &mut Vec<InstructionTacky>,
         tmp_num: u8,
     ) -> ValTacky {
         match cexp {
-            ExpC::Const { c } => ValTacky::Const { int: c },
-            ExpC::Unary { op, exp } => {
+            Exp::Const { c } => ValTacky::Const { int: c },
+            Exp::Unary { op, exp } => {
                 let src = self.translate_expression(*exp, instrs, tmp_num);
                 let dst = self.get_new_tmpvar();
                 instrs.push(InstructionTacky::Unary {
@@ -93,6 +93,7 @@ impl TackyEmitter {
                 });
                 dst
             }
+            _ => todo!(),
         }
     }
 
@@ -116,7 +117,7 @@ impl TackyEmitter {
 #[test]
 fn translate_return() {
     let return_three = StatementC::Return {
-        exp: Box::new(ExpC::Const { c: 3 }),
+        exp: Box::new(Exp::Const { c: 3 }),
     };
     assert_eq!(
         TackyEmitter::new().translate_statement(return_three),
@@ -139,9 +140,9 @@ fn translate_return() {
 #[test]
 fn translate_return_complement() {
     let return_comp_two = StatementC::Return {
-        exp: Box::new(ExpC::Unary {
+        exp: Box::new(Exp::Unary {
             op: UnaryOp::BitwiseComplement,
-            exp: Box::new(ExpC::Const { c: 2 }),
+            exp: Box::new(Exp::Const { c: 2 }),
         }),
     };
     assert_eq!(
@@ -174,13 +175,13 @@ fn translate_return_complement() {
 #[test]
 fn translate_threefold_unary() {
     let return_negcompneg_eight = StatementC::Return {
-        exp: Box::new(ExpC::Unary {
+        exp: Box::new(Exp::Unary {
             op: UnaryOp::Negate,
-            exp: Box::new(ExpC::Unary {
+            exp: Box::new(Exp::Unary {
                 op: UnaryOp::BitwiseComplement,
-                exp: Box::new(ExpC::Unary {
+                exp: Box::new(Exp::Unary {
                     op: UnaryOp::Negate,
-                    exp: Box::new(ExpC::Const { c: 8 }),
+                    exp: Box::new(Exp::Const { c: 8 }),
                 }),
             }),
         }),

@@ -88,13 +88,69 @@ impl Display for FunDefC {
 /// ```
 #[derive(PartialEq, Debug)]
 pub enum StatementC {
-    Return { exp: Box<ExpC> },
+    Return { exp: Box<Exp> },
 }
 
 impl Display for StatementC {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Return { exp } => write!(f, "return expression with inner exp : {}", exp),
+        }
+    }
+}
+
+/// Resolved C expression unifying ExpC and FactorC symbols.
+#[derive(PartialEq, Debug)]
+pub enum Exp {
+    Binary {
+        op: BinaryOp,
+        l_exp: Box<Exp>,
+        r_exp: Box<Exp>,
+    },
+    Const {
+        c: i32,
+    },
+    Unary {
+        op: UnaryOp,
+        exp: Box<Exp>,
+    },
+}
+
+impl Display for Exp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Exp::Binary { op, l_exp, r_exp } => write!(
+                f,
+                "Binary expression with op = {}, l_exp = {}, r_exp = {}",
+                op, *l_exp, *r_exp
+            ),
+            Exp::Const { c } => write!(f, "Constant expression with c = {}", c),
+            Exp::Unary { op, exp } => {
+                write!(f, "Unary expression with op = {}, exp = {}", op, *exp)
+            }
+        }
+    }
+}
+
+impl Exp {
+    fn from_expc(expc: ExpC) -> Self {
+        match expc {
+            ExpC::Factor { fac } => Self::from_factc(*fac),
+            ExpC::Binary { op, l_exp, r_exp } => Self::Binary {
+                op,
+                l_exp: Box::new(Self::from_expc(*l_exp)),
+                r_exp: Box::new(Self::from_expc(*r_exp)),
+            },
+        }
+    }
+    fn from_factc(factc: FactorC) -> Self {
+        match factc {
+            FactorC::Const { c } => Self::Const { c },
+            FactorC::Unary { op, fac } => Self::Unary {
+                op,
+                exp: Box::new(Self::from_factc(*fac)),
+            },
+            FactorC::Exp { exp } => Self::from_expc(*exp),
         }
     }
 }
@@ -109,7 +165,7 @@ impl Display for StatementC {
 /// <exp> ::= <factor> | <exp> <binop> <exp>
 /// ```
 #[derive(PartialEq, Debug)]
-pub enum ExpC {
+enum ExpC {
     Factor {
         fac: Box<FactorC>,
     },
@@ -160,7 +216,7 @@ impl Display for BinaryOp {
 /// <factor> ::= <int> | <unop> <factor> | "(" <exp> ")"
 /// ```
 #[derive(PartialEq, Debug)]
-pub enum FactorC {
+enum FactorC {
     Const { c: i32 },
     Unary { op: UnaryOp, fac: Box<FactorC> },
     Exp { exp: Box<ExpC> },
@@ -246,7 +302,7 @@ fn parse_fundef(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<FunDefC
 fn parse_statement(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<StatementC> {
     expect_variant(tokens, Token::RetKeyword)?;
     let ret = Ok(StatementC::Return {
-        exp: Box::new(parse_exp(tokens)?),
+        exp: Box::new(Exp::from_expc(parse_exp(tokens)?)),
     });
     expect_variant(tokens, Token::Semicolon)?;
     ret
@@ -272,6 +328,13 @@ fn parse_factor(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<FactorC
             op: UnaryOp::Negate,
             fac: Box::new(parse_factor(tokens)?),
         }),
+        Token::OpenParens => {
+            let inner = parse_exp(tokens)?;
+            expect_variant(tokens, Token::CloseParens)?;
+            Ok(FactorC::Exp {
+                exp: Box::new(inner),
+            })
+        }
         _ => Err(ParseError::InvalidSyntax {
             got,
             expected: Token::Constant { val: 42 },
@@ -323,7 +386,16 @@ fn test_variant_success() {
     assert!(res.is_ok());
 }
 
-/// tests the parsing of ~(~(~2))
+/// tests the parsing of `2`
+#[test]
+fn test_constant_exp() {
+    let mut tokens = vec![Token::Constant { val: 2 }].into_iter();
+    let res = parse_exp(&mut tokens);
+    assert!(res.is_ok());
+    assert_eq!(Exp::from_expc(res.unwrap()), Exp::Const { c: 2 });
+}
+
+/// tests the parsing of `~(~(~2))`
 #[test]
 fn test_nested_cmp_parens() {
     let mut tokens = vec![
@@ -339,8 +411,22 @@ fn test_nested_cmp_parens() {
     .into_iter();
     let res = parse_exp(&mut tokens);
     assert!(res.is_ok());
+    assert_eq!(
+        Exp::from_expc(res.unwrap()),
+        Exp::Unary {
+            op: UnaryOp::BitwiseComplement,
+            exp: Box::new(Exp::Unary {
+                op: UnaryOp::BitwiseComplement,
+                exp: Box::new(Exp::Unary {
+                    op: UnaryOp::BitwiseComplement,
+                    exp: Box::new(Exp::Const { c: 2 })
+                })
+            })
+        }
+    )
 }
 
+/// tests the parsing of `(((2)))`
 #[test]
 fn test_nested_parens() {
     let mut tokens = vec![
@@ -355,6 +441,7 @@ fn test_nested_parens() {
     .into_iter();
     let res = parse_exp(&mut tokens);
     assert!(res.is_ok());
+    assert_eq!(Exp::from_expc(res.unwrap()), Exp::Const { c: 2 });
 }
 
 /// tests the parsing of `return ~(~(~2));`

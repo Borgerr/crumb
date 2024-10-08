@@ -43,7 +43,7 @@ fn basic_return_from_main_parse() {
                 function: Box::new(parser::FunDefC {
                     identifier: String::from("main"),
                     statement: Box::new(parser::StatementC::Return {
-                        exp: Box::new(parser::ExpC::Const { c: 2 })
+                        exp: Box::new(parser::Exp::Const { c: 2 })
                     })
                 })
             }
@@ -119,7 +119,7 @@ fn whitespaceless_return_from_main_parse() {
                 function: Box::new(parser::FunDefC {
                     identifier: String::from("main"),
                     statement: Box::new(parser::StatementC::Return {
-                        exp: Box::new(parser::ExpC::Const { c: 2 })
+                        exp: Box::new(parser::Exp::Const { c: 2 })
                     })
                 })
             }
