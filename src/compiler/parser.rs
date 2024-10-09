@@ -326,7 +326,7 @@ fn parse_fundef(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<FunDefC
 fn parse_statement(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<StatementC> {
     let tokens = &mut tokens.peekable();
     expect_variant(tokens, Token::RetKeyword)?;
-    let expc = parse_exp(tokens)?;
+    let expc = parse_exp(tokens, 0)?;
     let exp = Exp::from_expc(expc);
     let ret = Ok(StatementC::Return { exp: Box::new(exp) });
     expect_variant(tokens, Token::Semicolon)?;
@@ -335,28 +335,25 @@ fn parse_statement(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<Stat
 
 /// Expects an expression.
 /// If this isn't found, returns an error.
-fn parse_exp(tokens: &mut Peekable<&mut impl Iterator<Item = Token>>) -> ParseResult<ExpC> {
+fn parse_exp(
+    tokens: &mut Peekable<&mut impl Iterator<Item = Token>>,
+    min_prec: u8,
+) -> ParseResult<ExpC> {
     let mut left = ExpC::Factor {
         fac: Box::new(parse_factor(tokens)?),
     };
 
-    loop {
-        let peek_res = tokens.next_if(|t| matches!(t, Token::Plus | Token::Minus));
-        let next_token = match peek_res {
-            Some(token) => token,
-            None => return Ok(left),
-        };
-        match next_token {
-            Token::Plus | Token::Minus => {
-                left = ExpC::Binary {
-                    op: BinaryOp::from(next_token.clone())?,
-                    l_exp: Box::new(left),
-                    r_exp: Box::new(ExpC::Factor {
-                        fac: Box::new(parse_factor(tokens)?),
-                    }),
-                }
-            }
-            _ => break,
+    while let Some(next_token) = tokens.next_if(|t| {
+        matches!(
+            t,
+            Token::Plus | Token::Minus | Token::Asterisk | Token::FSlash | Token::Percent
+        ) && t.precedence() >= min_prec
+    }) {
+        let prec = next_token.precedence() + 1;
+        left = ExpC::Binary {
+            op: BinaryOp::from(next_token)?,
+            l_exp: Box::new(left),
+            r_exp: Box::new(parse_exp(tokens, prec)?),
         }
     }
 
@@ -376,7 +373,7 @@ fn parse_factor(tokens: &mut Peekable<&mut impl Iterator<Item = Token>>) -> Pars
             fac: Box::new(parse_factor(tokens)?),
         }),
         Token::OpenParens => {
-            let inner = parse_exp(tokens)?;
+            let inner = parse_exp(tokens, 0)?;
             expect_variant(tokens, Token::CloseParens)?;
             Ok(FactorC::Exp {
                 exp: Box::new(inner),
@@ -441,7 +438,7 @@ fn test_variant_success() {
 fn test_constant_exp() {
     let tokens = &mut vec![Token::Constant { val: 2 }].into_iter();
     let tokens = &mut tokens.peekable();
-    let res = parse_exp(tokens);
+    let res = parse_exp(tokens, 0);
     let res = res.unwrap();
     assert_eq!(Exp::from_expc(res), Exp::Const { c: 2 });
 }
@@ -461,7 +458,7 @@ fn test_nested_cmp_parens() {
     ]
     .into_iter();
     let tokens = &mut tokens.peekable();
-    let res = parse_exp(tokens);
+    let res = parse_exp(tokens, 0);
     let res = res.unwrap();
     assert_eq!(
         Exp::from_expc(res),
@@ -492,7 +489,7 @@ fn test_nested_parens() {
     ]
     .into_iter();
     let tokens = &mut tokens.peekable();
-    let res = parse_exp(tokens);
+    let res = parse_exp(tokens, 0);
     let res = res.unwrap();
     assert_eq!(Exp::from_expc(res), Exp::Const { c: 2 });
 }
@@ -526,7 +523,7 @@ fn test_one_plus_one() {
         Token::Constant { val: 1 },
     ]
     .into_iter();
-    let res = parse_exp(&mut tokens.peekable());
+    let res = parse_exp(&mut tokens.peekable(), 0);
     let res = res.unwrap();
     let expected = ExpC::Binary {
         op: BinaryOp::Add,
@@ -551,7 +548,7 @@ fn test_one_plus_two_minus_three() {
         Token::Constant { val: 3 },
     ]
     .into_iter();
-    let res = parse_exp(&mut tokens.peekable());
+    let res = parse_exp(&mut tokens.peekable(), 0);
     let res = Exp::from_expc(res.unwrap());
     let expected = Exp::Binary {
         op: BinaryOp::Subtract,
@@ -561,6 +558,97 @@ fn test_one_plus_two_minus_three() {
             r_exp: Box::new(Exp::Const { c: 2 }),
         }),
         r_exp: Box::new(Exp::Const { c: 3 }),
+    };
+    assert_eq!(res, expected);
+}
+
+/// tests the parsing of `1 + (2 - 3)`
+#[test]
+fn test_one_plus_parens_two_minus_three() {
+    let tokens = &mut vec![
+        Token::Constant { val: 1 },
+        Token::Plus,
+        Token::OpenParens,
+        Token::Constant { val: 2 },
+        Token::Minus,
+        Token::Constant { val: 3 },
+        Token::CloseParens,
+    ]
+    .into_iter();
+    let res = parse_exp(&mut tokens.peekable(), 0);
+    let res = Exp::from_expc(res.unwrap());
+    let expected = Exp::Binary {
+        op: BinaryOp::Add,
+        l_exp: Box::new(Exp::Const { c: 1 }),
+        r_exp: Box::new(Exp::Binary {
+            op: BinaryOp::Subtract,
+            l_exp: Box::new(Exp::Const { c: 2 }),
+            r_exp: Box::new(Exp::Const { c: 3 }),
+        }),
+    };
+    assert_eq!(res, expected);
+}
+
+/// tests the parsing of `1 + 2 * 3`
+#[test]
+fn test_one_plus_two_times_three() {
+    let tokens = &mut vec![
+        Token::Constant { val: 1 },
+        Token::Plus,
+        Token::Constant { val: 2 },
+        Token::Asterisk,
+        Token::Constant { val: 3 },
+    ]
+    .into_iter();
+    let res = parse_exp(&mut tokens.peekable(), 0);
+    let res = Exp::from_expc(res.unwrap());
+    let expected = Exp::Binary {
+        op: BinaryOp::Add,
+        l_exp: Box::new(Exp::Const { c: 1 }),
+        r_exp: Box::new(Exp::Binary {
+            op: BinaryOp::Multiply,
+            l_exp: Box::new(Exp::Const { c: 2 }),
+            r_exp: Box::new(Exp::Const { c: 3 }),
+        }),
+    };
+    assert_eq!(res, expected);
+}
+
+/// tests the parsing of `1 * 2 - 3 * (4 + 5)`
+#[test]
+fn test_one_times_two_minus_three_times_parens_four_plus_five() {
+    let tokens = &mut vec![
+        Token::Constant { val: 1 },
+        Token::Asterisk,
+        Token::Constant { val: 2 },
+        Token::Minus,
+        Token::Constant { val: 3 },
+        Token::Asterisk,
+        Token::OpenParens,
+        Token::Constant { val: 4 },
+        Token::Plus,
+        Token::Constant { val: 5 },
+        Token::CloseParens,
+    ]
+    .into_iter();
+    let res = parse_exp(&mut tokens.peekable(), 0);
+    let res = Exp::from_expc(res.unwrap());
+    let expected = Exp::Binary {
+        op: BinaryOp::Subtract,
+        l_exp: Box::new(Exp::Binary {
+            op: BinaryOp::Multiply,
+            l_exp: Box::new(Exp::Const { c: 1 }),
+            r_exp: Box::new(Exp::Const { c: 2 }),
+        }),
+        r_exp: Box::new(Exp::Binary {
+            op: BinaryOp::Multiply,
+            l_exp: Box::new(Exp::Const { c: 3 }),
+            r_exp: Box::new(Exp::Binary {
+                op: BinaryOp::Add,
+                l_exp: Box::new(Exp::Const { c: 4 }),
+                r_exp: Box::new(Exp::Const { c: 5 }),
+            }),
+        }),
     };
     assert_eq!(res, expected);
 }
