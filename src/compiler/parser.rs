@@ -1,4 +1,4 @@
-use std::{fmt::Display, vec::IntoIter};
+use std::{fmt::Display, iter::Peekable};
 use thiserror::Error;
 
 use super::lexer::{Token, Type};
@@ -6,7 +6,7 @@ use super::lexer::{Token, Type};
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum ParseError {
     FundefError { reason: String },
-    SeverredStream,
+    SeverredStream { location: String },
     InvalidIdentifier { wrong_id: Token },
     InvalidSyntax { got: Token, expected: Token },
 }
@@ -19,7 +19,11 @@ impl Display for ParseError {
             Self::FundefError { reason } => {
                 write!(f, "(!) Error parsing function definition: {}", reason)
             }
-            Self::SeverredStream => write!(f, "(!) Error parsing interrupted stream of tokens"),
+            Self::SeverredStream { location } => write!(
+                f,
+                "(!) Error parsing interrupted stream of tokens in {}",
+                location
+            ),
             Self::InvalidIdentifier { wrong_id } => {
                 write!(f, "(!) Error parsing on invalid identifier: {}", wrong_id)
             }
@@ -210,6 +214,22 @@ impl Display for BinaryOp {
     }
 }
 
+impl BinaryOp {
+    fn from(token: Token) -> ParseResult<Self> {
+        match token {
+            Token::Plus => Ok(Self::Add),
+            Token::Minus => Ok(Self::Subtract),
+            Token::Asterisk => Ok(Self::Multiply),
+            Token::FSlash => Ok(Self::Divide),
+            Token::Percent => Ok(Self::Remainder),
+            _ => Err(ParseError::InvalidSyntax {
+                got: token,
+                expected: Token::Plus,
+            }),
+        }
+    }
+}
+
 /// Factor. Same ADT type as an expression, but allows for mutual recursion and precedence climbing.
 /// ### Formal Grammar as of v0.1.2
 /// ```text
@@ -261,7 +281,9 @@ pub fn parse(tokens: Vec<Token>) -> ParseResult<ProgramC> {
 /// Expects a function definition.
 /// If this isn't found, returns an error.
 fn parse_fundef(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<FunDefC> {
-    if expect_token(tokens)? != (Token::TyKeyword { ty: Type::Int }) {
+    if expect_token(tokens, String::from("parse_fundef (1)"))?
+        != (Token::TyKeyword { ty: Type::Int })
+    {
         return Err(ParseError::FundefError {
             reason: String::from(
                 "expected a function definition but first token was not a valid return type",
@@ -269,7 +291,7 @@ fn parse_fundef(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<FunDefC
         });
     }
 
-    let id_attempt = expect_token(tokens)?;
+    let id_attempt = expect_token(tokens, String::from("parse_fundef (2)"))?;
     let id_string = if let Token::Identifier { val } = id_attempt {
         val
     } else {
@@ -280,7 +302,9 @@ fn parse_fundef(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<FunDefC
 
     expect_variant(tokens, Token::OpenParens)?;
 
-    if expect_token(tokens)? != (Token::TyKeyword { ty: Type::Void }) {
+    if expect_token(tokens, String::from("parse_fundef (3)"))?
+        != (Token::TyKeyword { ty: Type::Void })
+    {
         return Err(ParseError::FundefError {
             reason: String::from("crumb v0.1.0 only accepts the `void` parameter"),
         });
@@ -300,24 +324,47 @@ fn parse_fundef(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<FunDefC
 /// Expects a statement.
 /// If this isn't found, returns an error.
 fn parse_statement(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<StatementC> {
+    let tokens = &mut tokens.peekable();
     expect_variant(tokens, Token::RetKeyword)?;
-    let ret = Ok(StatementC::Return {
-        exp: Box::new(Exp::from_expc(parse_exp(tokens)?)),
-    });
+    let expc = parse_exp(tokens)?;
+    let exp = Exp::from_expc(expc);
+    let ret = Ok(StatementC::Return { exp: Box::new(exp) });
     expect_variant(tokens, Token::Semicolon)?;
     ret
 }
 
 /// Expects an expression.
 /// If this isn't found, returns an error.
-fn parse_exp(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<ExpC> {
-    Ok(ExpC::Factor {
+fn parse_exp(tokens: &mut Peekable<&mut impl Iterator<Item = Token>>) -> ParseResult<ExpC> {
+    let mut left = ExpC::Factor {
         fac: Box::new(parse_factor(tokens)?),
-    })
+    };
+
+    loop {
+        let peek_res = tokens.next_if(|t| matches!(t, Token::Plus | Token::Minus));
+        let next_token = match peek_res {
+            Some(token) => token,
+            None => return Ok(left),
+        };
+        match next_token {
+            Token::Plus | Token::Minus => {
+                left = ExpC::Binary {
+                    op: BinaryOp::from(next_token.clone())?,
+                    l_exp: Box::new(left),
+                    r_exp: Box::new(ExpC::Factor {
+                        fac: Box::new(parse_factor(tokens)?),
+                    }),
+                }
+            }
+            _ => break,
+        }
+    }
+
+    Ok(left)
 }
 
-fn parse_factor(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<FactorC> {
-    let got = expect_token(tokens)?;
+fn parse_factor(tokens: &mut Peekable<&mut impl Iterator<Item = Token>>) -> ParseResult<FactorC> {
+    let got = expect_token(tokens, String::from("parse_factor"))?;
     match got {
         Token::Constant { val } => Ok(FactorC::Const { c: val }),
         Token::Tilde => Ok(FactorC::Unary {
@@ -342,15 +389,18 @@ fn parse_factor(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<FactorC
     }
 }
 
-fn expect_token(tokens: &mut impl Iterator<Item = Token>) -> ParseResult<Token> {
+fn expect_token(tokens: &mut impl Iterator<Item = Token>, location: String) -> ParseResult<Token> {
     match tokens.next() {
         Some(token) => Ok(token),
-        None => Err(ParseError::SeverredStream),
+        None => Err(ParseError::SeverredStream { location }),
     }
 }
 
 fn expect_variant(tokens: &mut impl Iterator<Item = Token>, expected: Token) -> ParseResult<()> {
-    let token = expect_token(tokens)?;
+    let token = expect_token(
+        tokens,
+        format!("expect_variant with expected token = {}", expected),
+    )?;
 
     if token == expected {
         Ok(())
@@ -389,16 +439,17 @@ fn test_variant_success() {
 /// tests the parsing of `2`
 #[test]
 fn test_constant_exp() {
-    let mut tokens = vec![Token::Constant { val: 2 }].into_iter();
-    let res = parse_exp(&mut tokens);
-    assert!(res.is_ok());
-    assert_eq!(Exp::from_expc(res.unwrap()), Exp::Const { c: 2 });
+    let tokens = &mut vec![Token::Constant { val: 2 }].into_iter();
+    let tokens = &mut tokens.peekable();
+    let res = parse_exp(tokens);
+    let res = res.unwrap();
+    assert_eq!(Exp::from_expc(res), Exp::Const { c: 2 });
 }
 
 /// tests the parsing of `~(~(~2))`
 #[test]
 fn test_nested_cmp_parens() {
-    let mut tokens = vec![
+    let tokens = &mut vec![
         Token::Tilde,
         Token::OpenParens,
         Token::Tilde,
@@ -409,10 +460,11 @@ fn test_nested_cmp_parens() {
         Token::CloseParens,
     ]
     .into_iter();
-    let res = parse_exp(&mut tokens);
-    assert!(res.is_ok());
+    let tokens = &mut tokens.peekable();
+    let res = parse_exp(tokens);
+    let res = res.unwrap();
     assert_eq!(
-        Exp::from_expc(res.unwrap()),
+        Exp::from_expc(res),
         Exp::Unary {
             op: UnaryOp::BitwiseComplement,
             exp: Box::new(Exp::Unary {
@@ -429,7 +481,7 @@ fn test_nested_cmp_parens() {
 /// tests the parsing of `(((2)))`
 #[test]
 fn test_nested_parens() {
-    let mut tokens = vec![
+    let tokens = &mut vec![
         Token::OpenParens,
         Token::OpenParens,
         Token::OpenParens,
@@ -439,9 +491,10 @@ fn test_nested_parens() {
         Token::CloseParens,
     ]
     .into_iter();
-    let res = parse_exp(&mut tokens);
-    assert!(res.is_ok());
-    assert_eq!(Exp::from_expc(res.unwrap()), Exp::Const { c: 2 });
+    let tokens = &mut tokens.peekable();
+    let res = parse_exp(tokens);
+    let res = res.unwrap();
+    assert_eq!(Exp::from_expc(res), Exp::Const { c: 2 });
 }
 
 /// tests the parsing of `return ~(~(~2));`
@@ -462,4 +515,52 @@ fn test_return_nested_parens() {
     .into_iter();
     let res = parse_statement(&mut tokens);
     assert!(res.is_ok());
+}
+
+/// tests the parsing of `1 + 1`
+#[test]
+fn test_one_plus_one() {
+    let tokens = &mut vec![
+        Token::Constant { val: 1 },
+        Token::Plus,
+        Token::Constant { val: 1 },
+    ]
+    .into_iter();
+    let res = parse_exp(&mut tokens.peekable());
+    let res = res.unwrap();
+    let expected = ExpC::Binary {
+        op: BinaryOp::Add,
+        l_exp: Box::new(ExpC::Factor {
+            fac: Box::new(FactorC::Const { c: 1 }),
+        }),
+        r_exp: Box::new(ExpC::Factor {
+            fac: Box::new(FactorC::Const { c: 1 }),
+        }),
+    };
+    assert_eq!(res, expected);
+}
+
+/// tests the parsing of `1 + 2 - 3`
+#[test]
+fn test_one_plus_two_minus_three() {
+    let tokens = &mut vec![
+        Token::Constant { val: 1 },
+        Token::Plus,
+        Token::Constant { val: 2 },
+        Token::Minus,
+        Token::Constant { val: 3 },
+    ]
+    .into_iter();
+    let res = parse_exp(&mut tokens.peekable());
+    let res = Exp::from_expc(res.unwrap());
+    let expected = Exp::Binary {
+        op: BinaryOp::Subtract,
+        l_exp: Box::new(Exp::Binary {
+            op: BinaryOp::Add,
+            l_exp: Box::new(Exp::Const { c: 1 }),
+            r_exp: Box::new(Exp::Const { c: 2 }),
+        }),
+        r_exp: Box::new(Exp::Const { c: 3 }),
+    };
+    assert_eq!(res, expected);
 }
