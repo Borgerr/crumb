@@ -18,8 +18,12 @@ pub struct FunDefTacky {
 }
 
 /// TACKY instruction
-/// ### Grammar as of v0.1.1
-/// `instruction = Return(val) | Unary(unary_operator, val src, val dst)`
+/// ### Grammar as of v0.1.2
+/// ```text
+/// instruction = Return(val)
+///             | Unary(unary_operator, val src, val dst)
+///             | Binary(binary_operator, val src1, val src2, val dst)
+/// ```
 #[derive(PartialEq, Debug)]
 pub enum InstructionTacky {
     Ret {
@@ -28,6 +32,12 @@ pub enum InstructionTacky {
     Unary {
         op: UnaryOp,
         src: ValTacky,
+        dst: ValTacky,
+    },
+    Binary {
+        op: BinaryOp,
+        src1: ValTacky,
+        src2: ValTacky,
         dst: ValTacky,
     },
 }
@@ -68,23 +78,18 @@ impl TackyEmitter {
         let mut instrs = Vec::new();
         match cstate {
             StatementC::Return { exp } => {
-                let v = self.translate_expression(*exp, &mut instrs, 0);
+                let v = self.translate_expression(*exp, &mut instrs);
                 instrs.push(InstructionTacky::Ret { v });
             }
         };
         instrs
     }
 
-    fn translate_expression(
-        &mut self,
-        cexp: Exp,
-        instrs: &mut Vec<InstructionTacky>,
-        tmp_num: u8,
-    ) -> ValTacky {
+    fn translate_expression(&mut self, cexp: Exp, instrs: &mut Vec<InstructionTacky>) -> ValTacky {
         match cexp {
             Exp::Const { c } => ValTacky::Const { int: c },
             Exp::Unary { op, exp } => {
-                let src = self.translate_expression(*exp, instrs, tmp_num);
+                let src = self.translate_expression(*exp, instrs);
                 let dst = self.get_new_tmpvar();
                 instrs.push(InstructionTacky::Unary {
                     op,
@@ -93,7 +98,18 @@ impl TackyEmitter {
                 });
                 dst
             }
-            _ => todo!(),
+            Exp::Binary { op, l_exp, r_exp } => {
+                let src1 = self.translate_expression(*l_exp, instrs);
+                let src2 = self.translate_expression(*r_exp, instrs);
+                let dst = self.get_new_tmpvar();
+                instrs.push(InstructionTacky::Binary {
+                    op,
+                    src1,
+                    src2,
+                    dst: dst.clone(),
+                });
+                dst
+            }
         }
     }
 
@@ -206,6 +222,41 @@ fn translate_threefold_unary() {
             },
             InstructionTacky::Ret {
                 v: ValTacky::TmpVar { no: 2 }
+            }
+        ]
+    );
+}
+
+/// ## TESTS THE FOLLOWING TRANSLATION
+/// ## C (AST input):
+/// ```c
+/// return 1 + 1;
+/// ```
+/// ### TACKY (output):
+/// ```text
+/// Binary(Add, Constant(1), Constant(1), Var("tmp.0"))
+/// Return(Var("tmp.0"))
+/// ```
+#[test]
+fn translate_one_plus_one() {
+    let ret_statement = StatementC::Return {
+        exp: Box::new(Exp::Binary {
+            op: BinaryOp::Add,
+            l_exp: Box::new(Exp::Const { c: 1 }),
+            r_exp: Box::new(Exp::Const { c: 2 }),
+        }),
+    };
+    assert_eq!(
+        TackyEmitter::new().translate_statement(ret_statement),
+        vec![
+            InstructionTacky::Binary {
+                op: BinaryOp::Add,
+                src1: ValTacky::Const { int: 1 },
+                src2: ValTacky::Const { int: 2 },
+                dst: ValTacky::TmpVar { no: 0 }
+            },
+            InstructionTacky::Ret {
+                v: ValTacky::TmpVar { no: 0 }
             }
         ]
     );

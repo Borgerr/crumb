@@ -257,6 +257,7 @@ fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<Instruction
                     },
                 ])
             }
+            _ => todo!(),
         }
     }
 
