@@ -1,6 +1,9 @@
 use std::{collections::HashMap, fmt::Display, fs};
 
-use super::{parser::UnaryOp, tacky::*};
+use super::{
+    parser::{BinaryOp, UnaryOp},
+    tacky::*,
+};
 
 /// x86-64 program
 /// ### Grammar as of v0.1.0
@@ -53,19 +56,39 @@ impl Display for FunDefAsm {
 }
 
 /// x86-64 instruction
-/// ### Grammar as of v0.1.1
+/// ### Grammar as of v0.1.2
 /// ```text
 /// instruction = Mov(operand src, operand dst)
 ///             | Unary(unary_operator, operand)
+///             | Binary(binary_operator, operand, operand)
+///             | Idiv(operand)
+///             | Cdq
 ///             | AllocateStack(int)
 ///             | Ret
 /// ```
 #[derive(PartialEq, Debug, Clone)]
 pub enum InstructionAsm {
-    Mov { src: OperandAsm, dst: OperandAsm },
+    Mov {
+        src: OperandAsm,
+        dst: OperandAsm,
+    },
     Ret,
-    Unary { unop: UnaryOp, operand: OperandAsm },
-    AllocStack { off: i32 },
+    Unary {
+        unop: UnaryOp,
+        operand: OperandAsm,
+    },
+    AllocStack {
+        off: i32,
+    },
+    Binary {
+        binop: BinaryOp,
+        src: OperandAsm,
+        dst: OperandAsm,
+    },
+    Idiv {
+        operand: OperandAsm,
+    },
+    Cdq,
 }
 
 impl Display for InstructionAsm {
@@ -78,6 +101,17 @@ impl Display for InstructionAsm {
                 UnaryOp::BitwiseComplement => write!(f, "notl {}", operand),
             },
             Self::AllocStack { off } => write!(f, "subq ${}, %rsp", -1 * off),
+            Self::Cdq => write!(f, "cdq"),
+            Self::Binary { binop, src, dst } => match binop {
+                BinaryOp::Add => write!(f, "addl {}, {}", src, dst),
+                BinaryOp::Subtract => write!(f, "subl {}, {}", src, dst),
+                BinaryOp::Multiply => write!(f, "imull {}, {}", src, dst),
+                _ => panic!(
+                    "unsupported BinaryOp variant stored in InstructionAsm::Binary {:?}",
+                    self
+                ),
+            },
+            Self::Idiv { operand } => write!(f, "idivl {}", operand),
         }
     }
 }
@@ -107,13 +141,17 @@ impl Display for OperandAsm {
 }
 
 /// x86-64 registers
-/// ### Used registers as of v0.1.1
+/// ### Used registers as of v0.1.2
 /// - AX
 /// - R10
+/// - DX
+/// - R11
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Register {
     AX,
     R10,
+    DX,
+    R11,
 }
 
 impl Display for Register {
@@ -121,6 +159,8 @@ impl Display for Register {
         match self {
             Self::AX => write!(f, "%eax"),
             Self::R10 => write!(f, "%r10d"),
+            Self::DX => write!(f, "%edx"),
+            Self::R11 => write!(f, "%r11d"),
         }
     }
 }
@@ -150,6 +190,8 @@ fn translate_fundef(tacky_fundef: FunDefTacky) -> FunDefAsm {
     }
 }
 
+/// fixes up instructions so that non-pseudo operands are correct for different instructions.
+/// Assumes that pseudo-operands have already been resolved.
 fn fix_up_instrs(resolved_instrs: Vec<InstructionAsm>, min_used: i32) -> Vec<InstructionAsm> {
     let mut res = Vec::with_capacity(resolved_instrs.len() + 1);
     if min_used != 0 {
@@ -158,9 +200,11 @@ fn fix_up_instrs(resolved_instrs: Vec<InstructionAsm>, min_used: i32) -> Vec<Ins
 
     for instr in resolved_instrs.into_iter() {
         match instr {
-            InstructionAsm::Mov { src, dst } => match src {
-                OperandAsm::Stack { off: _ } => match dst {
-                    OperandAsm::Stack { off: _ } => res.append(&mut vec![
+            InstructionAsm::Mov { src, dst } => {
+                if matches!(src, OperandAsm::Stack { off: _ })
+                    && matches!(dst, OperandAsm::Stack { off: _ })
+                {
+                    res.append(&mut vec![
                         InstructionAsm::Mov {
                             src,
                             dst: OperandAsm::Reg { r: Register::R10 },
@@ -169,9 +213,26 @@ fn fix_up_instrs(resolved_instrs: Vec<InstructionAsm>, min_used: i32) -> Vec<Ins
                             src: OperandAsm::Reg { r: Register::R10 },
                             dst,
                         },
-                    ]),
-                    _ => res.push(instr),
-                },
+                    ])
+                } else {
+                    res.push(instr)
+                }
+            }
+            InstructionAsm::Binary {
+                binop: _,
+                src: _,
+                dst: _,
+            } => resolve_binary(instr, &mut res),
+            InstructionAsm::Idiv { operand } => match operand {
+                OperandAsm::Imm { int } => res.append(&mut vec![
+                    InstructionAsm::Mov {
+                        src: OperandAsm::Imm { int },
+                        dst: OperandAsm::Reg { r: Register::R10 },
+                    },
+                    InstructionAsm::Idiv {
+                        operand: OperandAsm::Reg { r: Register::R10 },
+                    },
+                ]),
                 _ => res.push(instr),
             },
             _ => res.push(instr),
@@ -179,6 +240,48 @@ fn fix_up_instrs(resolved_instrs: Vec<InstructionAsm>, min_used: i32) -> Vec<Ins
     }
 
     res
+}
+
+fn resolve_binary(instr: InstructionAsm, instrs: &mut Vec<InstructionAsm>) {
+    if let InstructionAsm::Binary { binop, src, dst } = &instr {
+        match binop {
+            BinaryOp::Multiply => instrs.append(&mut vec![
+                InstructionAsm::Mov {
+                    src: *dst,
+                    dst: OperandAsm::Reg { r: Register::R11 },
+                },
+                InstructionAsm::Binary {
+                    binop: BinaryOp::Multiply,
+                    src: *src,
+                    dst: OperandAsm::Reg { r: Register::R11 },
+                },
+                InstructionAsm::Mov {
+                    src: OperandAsm::Reg { r: Register::R11 },
+                    dst: *dst,
+                },
+            ]),
+            BinaryOp::Add | BinaryOp::Subtract => {
+                if matches!(src, OperandAsm::Stack { off: _ })
+                    && matches!(dst, OperandAsm::Stack { off: _ })
+                {
+                    instrs.append(&mut vec![
+                        InstructionAsm::Mov {
+                            src: *src,
+                            dst: OperandAsm::Reg { r: Register::R10 },
+                        },
+                        InstructionAsm::Binary {
+                            binop: binop.clone(),
+                            src: OperandAsm::Reg { r: Register::R10 },
+                            dst: *dst,
+                        },
+                    ])
+                } else {
+                    instrs.push(instr)
+                }
+            }
+            _ => instrs.push(instr),
+        }
+    }
 }
 
 /// resolves temporary, or pseudo operands, to use an actual operand.
@@ -211,12 +314,20 @@ impl TmpVarResolver {
                 unop,
                 operand: self.temp_to_stack(operand),
             },
+            InstructionAsm::Binary { binop, src, dst } => InstructionAsm::Binary {
+                binop,
+                src: self.temp_to_stack(src),
+                dst: self.temp_to_stack(dst),
+            },
+            InstructionAsm::Idiv { operand } => InstructionAsm::Idiv {
+                operand: self.temp_to_stack(operand),
+            },
             _ => instr,
         }
     }
 
-    fn temp_to_stack(&mut self, op: OperandAsm) -> OperandAsm {
-        match op {
+    fn temp_to_stack(&mut self, operand: OperandAsm) -> OperandAsm {
+        match operand {
             OperandAsm::Pseudo { id } => match self.id_to_off.get(&id) {
                 Some(off) => OperandAsm::Stack { off: *off },
                 None => {
@@ -226,7 +337,7 @@ impl TmpVarResolver {
                     OperandAsm::Stack { off: self.min_used }
                 }
             },
-            _ => op,
+            _ => operand,
         }
     }
 }
@@ -257,7 +368,55 @@ fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<Instruction
                     },
                 ])
             }
-            _ => todo!(),
+            InstructionTacky::Binary {
+                op,
+                src1,
+                src2,
+                dst,
+            } => {
+                let src1 = translate_valtacky(src1);
+                let src2 = translate_valtacky(src2);
+                let dst = translate_valtacky(dst);
+                match op {
+                    BinaryOp::Add | BinaryOp::Subtract | BinaryOp::Multiply => {
+                        res.append(&mut vec![
+                            InstructionAsm::Mov {
+                                src: src1,
+                                dst: dst.clone(),
+                            },
+                            InstructionAsm::Binary {
+                                binop: op,
+                                src: src2,
+                                dst,
+                            },
+                        ])
+                    }
+                    BinaryOp::Divide => res.append(&mut vec![
+                        InstructionAsm::Mov {
+                            src: src1,
+                            dst: OperandAsm::Reg { r: Register::AX },
+                        },
+                        InstructionAsm::Cdq,
+                        InstructionAsm::Idiv { operand: src2 },
+                        InstructionAsm::Mov {
+                            src: OperandAsm::Reg { r: Register::AX },
+                            dst,
+                        },
+                    ]),
+                    BinaryOp::Remainder => res.append(&mut vec![
+                        InstructionAsm::Mov {
+                            src: src1,
+                            dst: OperandAsm::Reg { r: Register::AX },
+                        },
+                        InstructionAsm::Cdq,
+                        InstructionAsm::Idiv { operand: src2 },
+                        InstructionAsm::Mov {
+                            src: OperandAsm::Reg { r: Register::DX },
+                            dst,
+                        },
+                    ]),
+                }
+            }
         }
     }
 
