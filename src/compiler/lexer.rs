@@ -1,12 +1,16 @@
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::fmt::Display;
+use std::{fmt::Display, str::FromStr};
 use thiserror::Error;
 
 lazy_static! {
-    static ref idre: Regex =
+    static ref idre: Regex =    // identifiers
         Regex::new(r"^[a-zA-Z_]\w*\b").expect("failure creating identifier regex");
-    static ref constre: Regex = Regex::new(r"^[0-9]+\b").expect("failure creating const regex");
+    static ref constre: Regex = Regex::new(r"^[0-9]+\b").expect("failure creating const regex");    // constants
+    static ref single_char_re: Regex =    // single char tokens
+        Regex::new(r"^(\(|\)|\{|\}|;|\-|~|\+|\*|\/|%)").expect("failure creating single_charre regex");
+    static ref double_char_re: Regex = Regex::new(r"^(?:\-|\+){2}").expect("failure creating double_charre regex");
+    // ^ double char tokens; may have some weirdness with multiple matches?
 }
 
 #[derive(Clone, Error, Debug)]
@@ -71,6 +75,30 @@ impl Display for Token {
     }
 }
 
+impl FromStr for Token {
+    type Err = LexError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            r"(" => Ok(Self::OpenParens),
+            r")" => Ok(Self::CloseParens),
+            r"{" => Ok(Self::OpenBrace),
+            r"}" => Ok(Self::CloseBrace),
+            r";" => Ok(Self::Semicolon),
+            r"-" => Ok(Self::Minus),
+            r"--" => Ok(Self::MinusMinus),
+            r"~" => Ok(Self::Tilde),
+            r"+" => Ok(Self::Plus),
+            r"*" => Ok(Self::Asterisk),
+            r"/" => Ok(Self::FSlash),
+            r"%" => Ok(Self::Percent),
+            _ => Err(LexError::Unrecognized {
+                strang: s.to_string(),
+            }),
+        }
+    }
+}
+
 impl Token {
     pub fn precedence(&self) -> u8 {
         match self {
@@ -110,46 +138,16 @@ pub fn tokenize(source: String) -> Result<Vec<Token>, LexError> {
             strang = strang.trim_start_matches(mat.as_str());
             check_for_keywords(mat.as_str())
         } else if let Some(mat) = constre.find(strang) {
-            strang = strang.trim_start_matches(mat.as_str());
+            strang = strang.strip_prefix(mat.as_str()).unwrap();
             Token::Constant {
                 val: mat.as_str().parse().unwrap(),
             }
-        } else if strang.starts_with(r"(") {
-            strang = strang.strip_prefix(r"(").unwrap();
-            Token::OpenParens
-        } else if strang.starts_with(r")") {
-            strang = strang.strip_prefix(r")").unwrap();
-            Token::CloseParens
-        } else if strang.starts_with(r"{") {
-            strang = strang.strip_prefix(r"{").unwrap();
-            Token::OpenBrace
-        } else if strang.starts_with(r"}") {
-            strang = strang.strip_prefix(r"}").unwrap();
-            Token::CloseBrace
-        } else if strang.starts_with(r";") {
-            strang = strang.strip_prefix(r";").unwrap();
-            Token::Semicolon
-        } else if strang.starts_with(r"--") {
-            strang = strang.strip_prefix(r"--").unwrap();
-            Token::MinusMinus
-        } else if strang.starts_with(r"-") {
-            strang = strang.strip_prefix(r"-").unwrap();
-            Token::Minus
-        } else if strang.starts_with(r"~") {
-            strang = strang.strip_prefix(r"~").unwrap();
-            Token::Tilde
-        } else if strang.starts_with(r"+") {
-            strang = strang.strip_prefix(r"+").unwrap();
-            Token::Plus
-        } else if strang.starts_with(r"*") {
-            strang = strang.strip_prefix(r"*").unwrap();
-            Token::Asterisk
-        } else if strang.starts_with(r"/") {
-            strang = strang.strip_prefix(r"/").unwrap();
-            Token::FSlash
-        } else if strang.starts_with(r"%") {
-            strang = strang.strip_prefix(r"%").unwrap();
-            Token::Percent
+        } else if let Some(mat) = double_char_re.find(strang) {
+            strang = strang.strip_prefix(mat.as_str()).unwrap();
+            Token::from(mat.as_str().parse().unwrap())
+        } else if let Some(mat) = single_char_re.find(strang) {
+            strang = strang.strip_prefix(mat.as_str()).unwrap();
+            Token::from(mat.as_str().parse().unwrap())
         } else {
             return Err(LexError::Unrecognized {
                 strang: strang.to_string(),
@@ -162,9 +160,9 @@ pub fn tokenize(source: String) -> Result<Vec<Token>, LexError> {
 
 fn check_for_keywords(strang: &str) -> Token {
     match strang {
-        s if s.starts_with("int") => Token::TyKeyword { ty: Type::Int },
-        s if s.starts_with("void") => Token::TyKeyword { ty: Type::Void },
-        s if s.starts_with("return") => Token::RetKeyword,
+        "int" => Token::TyKeyword { ty: Type::Int },
+        "void" => Token::TyKeyword { ty: Type::Void },
+        "return" => Token::RetKeyword,
         _ => Token::Identifier {
             val: String::from(strang),
         },
@@ -195,6 +193,19 @@ fn test_lex_nested_cmp() {
         Token::CloseParens,
         Token::Semicolon,
         Token::CloseBrace,
+    ];
+    assert_eq!(tokens, expected);
+}
+
+#[test]
+fn test_parenthesis() {
+    let source = String::from("(())");
+    let tokens = tokenize(source).unwrap();
+    let expected = vec![
+        Token::OpenParens,
+        Token::OpenParens,
+        Token::CloseParens,
+        Token::CloseParens,
     ];
     assert_eq!(tokens, expected);
 }
