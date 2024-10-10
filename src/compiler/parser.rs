@@ -193,7 +193,7 @@ impl Display for ExpC {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum BinaryOp {
     Add,
     Subtract,
@@ -648,6 +648,31 @@ fn test_one_times_two_minus_three_times_parens_four_plus_five() {
                 l_exp: Box::new(Exp::Const { c: 4 }),
                 r_exp: Box::new(Exp::Const { c: 5 }),
             }),
+        }),
+    };
+    assert_eq!(res, expected);
+}
+
+/// tests the parsing of `-(1 + 1)`
+#[test]
+fn test_negate_one_plus_one() {
+    let tokens = &mut vec![
+        Token::Minus,
+        Token::OpenParens,
+        Token::Constant { val: 1 },
+        Token::Plus,
+        Token::Constant { val: 1 },
+        Token::CloseParens,
+    ]
+    .into_iter();
+    let res = parse_exp(&mut tokens.peekable(), 0);
+    let res = Exp::from_expc(res.unwrap());
+    let expected = Exp::Unary {
+        op: UnaryOp::Negate,
+        exp: Box::new(Exp::Binary {
+            op: BinaryOp::Add,
+            l_exp: Box::new(Exp::Const { c: 1 }),
+            r_exp: Box::new(Exp::Const { c: 1 }),
         }),
     };
     assert_eq!(res, expected);

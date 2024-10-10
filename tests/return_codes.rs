@@ -59,3 +59,19 @@ basic_mainret!(return_negcmpneg_three, "-(~(-3))", -(!(-3)));
 basic_mainret!(return_quadneg_three, "-(-(-(-3)))", -(-(-(-3))));
 basic_mainret!(return_quadcmp_three, "~(~(~(~3)))", !(!(!(!3))));
 basic_mainret!(return_cmpnegcmpneg_three, "~(-(~(-3)))", !(-(!(-3))));
+
+basic_mainret!(return_one_plus_one, "1 + 1", 1 + 1);
+basic_mainret!(return_one_minus_one, "1 - 1", 1 - 1);
+basic_mainret!(return_two_times_three, "2 * 3", 2 * 3);
+basic_mainret!(return_one_plus_two_times_three, "1 + 2 * 3", 1 + 2 * 3);
+basic_mainret!(return_four_div_two, "4 / 2", 4 / 2);
+basic_mainret!(
+    return_one_times_two_minus_three_times_parens_four_plus_five,
+    "1 * 2 - 3 * (4 + 5)",
+    1 * 2 - 3 * (4 + 5)
+);
+basic_mainret!(
+    return_unary_and_binary,
+    "-(1 + 1) * ~(4 - 5)",
+    -(1 + 1) * !(4 - 5)
+);
