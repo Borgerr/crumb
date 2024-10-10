@@ -8,8 +8,8 @@ lazy_static! {
         Regex::new(r"^[a-zA-Z_]\w*\b").expect("failure creating identifier regex");
     static ref constre: Regex = Regex::new(r"^[0-9]+\b").expect("failure creating const regex");    // constants
     static ref single_char_re: Regex =    // single char tokens
-        Regex::new(r"^(\(|\)|\{|\}|;|\-|~|\+|\*|\/|%)").expect("failure creating single_charre regex");
-    static ref double_char_re: Regex = Regex::new(r"^(?:\-|\+){2}").expect("failure creating double_charre regex");
+        Regex::new(r"^(\(|\)|\{|\}|;|\-|~|\+|\*|\/|%|&|\||\^)").expect("failure creating single_charre regex");
+    static ref double_char_re: Regex = Regex::new(r"^(?:\-|\+|>|<){2}").expect("failure creating double_charre regex");
     // ^ double char tokens; may have some weirdness with multiple matches?
 }
 
@@ -50,6 +50,11 @@ pub enum Token {
     Asterisk,                   // *
     FSlash,                     // /
     Percent,                    // %
+    Ampersand,                  // &
+    Pipe,                       // |
+    Caret,                      // ^
+    GtGt,                       // >>
+    LtLt,                       // <<
 }
 
 impl Display for Token {
@@ -71,6 +76,11 @@ impl Display for Token {
             Self::Asterisk => write!(f, "* symbol"),
             Self::FSlash => write!(f, "/ symbol"),
             Self::Percent => write!(f, "% symbol"),
+            Token::Ampersand => write!(f, "& symbol"),
+            Token::Pipe => write!(f, "| symbol"),
+            Token::Caret => write!(f, "^ symbol"),
+            Token::GtGt => write!(f, ">> symbol"),
+            Token::LtLt => write!(f, "<< symbol"),
         }
     }
 }
@@ -92,6 +102,11 @@ impl FromStr for Token {
             r"*" => Ok(Self::Asterisk),
             r"/" => Ok(Self::FSlash),
             r"%" => Ok(Self::Percent),
+            r"&" => Ok(Self::Ampersand),
+            r"|" => Ok(Self::Pipe),
+            r"^" => Ok(Self::Caret),
+            r">>" => Ok(Self::GtGt),
+            r"<<" => Ok(Self::LtLt),
             _ => Err(LexError::Unrecognized {
                 strang: s.to_string(),
             }),
@@ -206,6 +221,34 @@ fn test_parenthesis() {
         Token::OpenParens,
         Token::CloseParens,
         Token::CloseParens,
+    ];
+    assert_eq!(tokens, expected);
+}
+
+/// tests the independent lexing of all operators
+/// BE SURE TO CHANGE THIS TEST WITH MORE OPERATORS
+#[test]
+fn test_lex_operators() {
+    let source = String::from(r"( ) { } ; - -- ~ + * / % & | ^ >> <<");
+    let tokens = tokenize(source).unwrap();
+    let expected = vec![
+        Token::OpenParens,
+        Token::CloseParens,
+        Token::OpenBrace,
+        Token::CloseBrace,
+        Token::Semicolon,
+        Token::Minus,
+        Token::MinusMinus,
+        Token::Tilde,
+        Token::Plus,
+        Token::Asterisk,
+        Token::FSlash,
+        Token::Percent,
+        Token::Ampersand,
+        Token::Pipe,
+        Token::Caret,
+        Token::GtGt,
+        Token::LtLt,
     ];
     assert_eq!(tokens, expected);
 }
