@@ -415,6 +415,7 @@ fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<Instruction
                             dst,
                         },
                     ]),
+                    _ => todo!("finish supporting other binary operations"),
                 }
             }
         }

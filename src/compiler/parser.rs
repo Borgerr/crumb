@@ -200,6 +200,11 @@ pub enum BinaryOp {
     Multiply,
     Divide,
     Remainder,
+    BitwiseAnd,
+    BitwiseOr,
+    BitwiseXor,
+    ShiftRight,
+    ShiftLeft,
 }
 
 impl Display for BinaryOp {
@@ -210,6 +215,11 @@ impl Display for BinaryOp {
             Self::Multiply => write!(f, "Multiply"),
             Self::Divide => write!(f, "Divide"),
             Self::Remainder => write!(f, "Remainder"),
+            Self::BitwiseAnd => write!(f, "Bitwise 'and'"),
+            Self::BitwiseOr => write!(f, "Bitwise 'or'"),
+            Self::BitwiseXor => write!(f, "Bitwise 'xor'"),
+            Self::ShiftRight => write!(f, "Shift right"),
+            Self::ShiftLeft => write!(f, "Shift left"),
         }
     }
 }
@@ -222,10 +232,26 @@ impl BinaryOp {
             Token::Asterisk => Ok(Self::Multiply),
             Token::FSlash => Ok(Self::Divide),
             Token::Percent => Ok(Self::Remainder),
+            Token::Ampersand => Ok(Self::BitwiseAnd),
+            Token::Pipe => Ok(Self::BitwiseOr),
+            Token::Caret => Ok(Self::BitwiseXor),
+            Token::GtGt => Ok(Self::ShiftRight),
+            Token::LtLt => Ok(Self::ShiftLeft),
             _ => Err(ParseError::InvalidSyntax {
                 got: token,
                 expected: Token::Plus,
             }),
+        }
+    }
+    fn token_prec(token: &Token) -> u8 {
+        match token {
+            Token::Pipe => 0,
+            Token::Caret => 1,
+            Token::Ampersand => 2,
+            Token::GtGt | Token::LtLt => 3,
+            Token::Plus | Token::Minus => 4,
+            Token::Asterisk | Token::FSlash | Token::Percent => 5,
+            _ => 255,
         }
     }
 }
@@ -346,10 +372,19 @@ fn parse_exp(
     while let Some(next_token) = tokens.next_if(|t| {
         matches!(
             t,
-            Token::Plus | Token::Minus | Token::Asterisk | Token::FSlash | Token::Percent
-        ) && t.precedence() >= min_prec
+            Token::Plus
+                | Token::Minus
+                | Token::Asterisk
+                | Token::FSlash
+                | Token::Percent
+                | Token::Ampersand
+                | Token::Pipe
+                | Token::Caret
+                | Token::GtGt
+                | Token::LtLt
+        ) && BinaryOp::token_prec(&t) >= min_prec
     }) {
-        let prec = next_token.precedence() + 1;
+        let prec = BinaryOp::token_prec(&next_token) + 1;
         left = ExpC::Binary {
             op: BinaryOp::from(next_token)?,
             l_exp: Box::new(left),

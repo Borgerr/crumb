@@ -114,16 +114,6 @@ impl FromStr for Token {
     }
 }
 
-impl Token {
-    pub fn precedence(&self) -> u8 {
-        match self {
-            Token::Plus | Token::Minus => 0,
-            Token::Asterisk | Token::FSlash | Token::Percent => 1,
-            _ => 2,
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq)]
 /// Type for types supported by the compiler.
 /// Only useful in tokenizing.
