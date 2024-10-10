@@ -75,3 +75,14 @@ basic_mainret!(
     "-(1 + 1) * ~(4 - 5)",
     -(1 + 1) * !(4 - 5)
 );
+
+basic_mainret!(return_zero_and_127, "0 & 127", 0 & 127);
+basic_mainret!(return_zero_or_127, "0 | 127", 0 | 127);
+basic_mainret!(return_xor_self, "42 ^ 42", 42 ^ 42);
+basic_mainret!(return_two_shiftright_one, "2 >> 1", 2 >> 1);
+basic_mainret!(return_one_shiftleft_two, "1 << 2", 1 << 2);
+basic_mainret!(
+    return_big_bitwise_guy,
+    "1 ^ 2 & 3 << (4 | 5)",
+    1 ^ 2 & 3 << (4 | 5)
+);

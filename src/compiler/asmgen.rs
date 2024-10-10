@@ -106,6 +106,11 @@ impl Display for InstructionAsm {
                 BinaryOp::Add => write!(f, "addl {}, {}", src, dst),
                 BinaryOp::Subtract => write!(f, "subl {}, {}", src, dst),
                 BinaryOp::Multiply => write!(f, "imull {}, {}", src, dst),
+                BinaryOp::BitwiseAnd => write!(f, "andl {}, {}", src, dst),
+                BinaryOp::BitwiseOr => write!(f, "orl {}, {}", src, dst),
+                BinaryOp::BitwiseXor => write!(f, "xorl {}, {}", src, dst),
+                BinaryOp::ShiftLeft => write!(f, "shll {}, {}", src, dst),
+                BinaryOp::ShiftRight => write!(f, "shrl {}, {}", src, dst),
                 _ => panic!(
                     "unsupported BinaryOp variant stored in InstructionAsm::Binary {:?}",
                     self
@@ -260,7 +265,7 @@ fn resolve_binary(instr: InstructionAsm, instrs: &mut Vec<InstructionAsm>) {
                     dst: *dst,
                 },
             ]),
-            BinaryOp::Add | BinaryOp::Subtract => {
+            _ => {
                 if matches!(src, OperandAsm::Stack { off: _ })
                     && matches!(dst, OperandAsm::Stack { off: _ })
                 {
@@ -378,19 +383,6 @@ fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<Instruction
                 let src2 = translate_valtacky(src2);
                 let dst = translate_valtacky(dst);
                 match op {
-                    BinaryOp::Add | BinaryOp::Subtract | BinaryOp::Multiply => {
-                        res.append(&mut vec![
-                            InstructionAsm::Mov {
-                                src: src1,
-                                dst: dst.clone(),
-                            },
-                            InstructionAsm::Binary {
-                                binop: op,
-                                src: src2,
-                                dst,
-                            },
-                        ])
-                    }
                     BinaryOp::Divide => res.append(&mut vec![
                         InstructionAsm::Mov {
                             src: src1,
@@ -415,7 +407,17 @@ fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<Instruction
                             dst,
                         },
                     ]),
-                    _ => todo!("finish supporting other binary operations"),
+                    _ => res.append(&mut vec![
+                        InstructionAsm::Mov {
+                            src: src1,
+                            dst: dst.clone(),
+                        },
+                        InstructionAsm::Binary {
+                            binop: op,
+                            src: src2,
+                            dst,
+                        },
+                    ]),
                 }
             }
         }
