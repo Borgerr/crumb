@@ -8,8 +8,8 @@ lazy_static! {
         Regex::new(r"^[a-zA-Z_]\w*\b").expect("failure creating identifier regex");
     static ref constre: Regex = Regex::new(r"^[0-9]+\b").expect("failure creating const regex");    // constants
     static ref single_char_re: Regex =    // single char tokens
-        Regex::new(r"^(\(|\)|\{|\}|;|\-|~|\+|\*|\/|%|&|\||\^)").expect("failure creating single_charre regex");
-    static ref double_char_re: Regex = Regex::new(r"^(?:\-|\+|>|<){2}").expect("failure creating double_charre regex");
+        Regex::new(r"^(\(|\)|\{|\}|;|\-|~|\+|\*|\/|%|&|\||\^|!|<|>)").expect("failure creating single_charre regex");
+    static ref double_char_re: Regex = Regex::new(r"^((?:\-|\+|>|<|\||&|=){2}|(<=|>=|!=))").expect("failure creating double_charre regex");
     // ^ double char tokens; may have some weirdness with multiple matches?
 }
 
@@ -53,6 +53,15 @@ pub enum Token {
     Ampersand,                  // &
     Pipe,                       // |
     Caret,                      // ^
+    Bang,                       // !
+    DoubleEqual,                // ==
+    LessThan,                   // <
+    GreaterThan,                // >
+    BangEq,                     // !=
+    Leq,                        // <=
+    Geq,                        // >=
+    AmpersandAmpersand,         // &&
+    PipePipe,                   // ||
 }
 
 impl Display for Token {
@@ -74,9 +83,18 @@ impl Display for Token {
             Self::Asterisk => write!(f, "* symbol"),
             Self::FSlash => write!(f, "/ symbol"),
             Self::Percent => write!(f, "% symbol"),
-            Token::Ampersand => write!(f, "& symbol"),
-            Token::Pipe => write!(f, "| symbol"),
-            Token::Caret => write!(f, "^ symbol"),
+            Self::Ampersand => write!(f, "& symbol"),
+            Self::Pipe => write!(f, "| symbol"),
+            Self::Caret => write!(f, "^ symbol"),
+            Self::Bang => write!(f, "! symbol"),
+            Self::DoubleEqual => write!(f, "== symbol"),
+            Self::LessThan => write!(f, "< symbol"),
+            Self::GreaterThan => write!(f, "> symbol"),
+            Self::BangEq => write!(f, "!= symbol"),
+            Self::AmpersandAmpersand => write!(f, "&& symbol"),
+            Self::PipePipe => write!(f, "|| symbol"),
+            Self::Leq => write!(f, "<= symbol"),
+            Self::Geq => write!(f, ">= symbol"),
         }
     }
 }
@@ -101,6 +119,15 @@ impl FromStr for Token {
             r"&" => Ok(Self::Ampersand),
             r"|" => Ok(Self::Pipe),
             r"^" => Ok(Self::Caret),
+            r"!" => Ok(Self::Bang),
+            r"==" => Ok(Self::DoubleEqual),
+            r"<" => Ok(Self::LessThan),
+            r">" => Ok(Self::GreaterThan),
+            r"!=" => Ok(Self::BangEq),
+            r"<=" => Ok(Self::Leq),
+            r">=" => Ok(Self::Geq),
+            r"&&" => Ok(Self::AmpersandAmpersand),
+            r"||" => Ok(Self::PipePipe),
             _ => Err(LexError::Unrecognized {
                 strang: s.to_string(),
             }),
@@ -213,7 +240,7 @@ fn test_parenthesis() {
 /// BE SURE TO CHANGE THIS TEST WITH MORE OPERATORS
 #[test]
 fn test_lex_operators() {
-    let source = String::from(r"( ) { } ; - -- ~ + * / % & | ^");
+    let source = String::from(r"( ) { } ; - -- ~ + * / % & | ^ ! < > == != <= >= && ||");
     let tokens = tokenize(source).unwrap();
     let expected = vec![
         Token::OpenParens,
@@ -231,6 +258,15 @@ fn test_lex_operators() {
         Token::Ampersand,
         Token::Pipe,
         Token::Caret,
+        Token::Bang,
+        Token::LessThan,
+        Token::GreaterThan,
+        Token::DoubleEqual,
+        Token::BangEq,
+        Token::Leq,
+        Token::Geq,
+        Token::AmpersandAmpersand,
+        Token::PipePipe,
     ];
     assert_eq!(tokens, expected);
 }
