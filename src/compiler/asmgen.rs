@@ -282,7 +282,6 @@ fn resolve_binary(instr: InstructionAsm, instrs: &mut Vec<InstructionAsm>) {
                     instrs.push(instr)
                 }
             }
-            _ => instrs.push(instr),
         }
     }
 }
