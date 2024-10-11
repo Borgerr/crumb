@@ -109,8 +109,6 @@ impl Display for InstructionAsm {
                 BinaryOp::BitwiseAnd => write!(f, "andl {}, {}", src, dst),
                 BinaryOp::BitwiseOr => write!(f, "orl {}, {}", src, dst),
                 BinaryOp::BitwiseXor => write!(f, "xorl {}, {}", src, dst),
-                BinaryOp::ShiftLeft => write!(f, "shll {}, {}", src, dst),
-                BinaryOp::ShiftRight => write!(f, "shrl {}, {}", src, dst),
                 _ => panic!(
                     "unsupported BinaryOp variant stored in InstructionAsm::Binary {:?}",
                     self
@@ -256,7 +254,7 @@ fn resolve_binary(instr: InstructionAsm, instrs: &mut Vec<InstructionAsm>) {
                     dst: OperandAsm::Reg { r: Register::R11 },
                 },
                 InstructionAsm::Binary {
-                    binop: BinaryOp::Multiply,
+                    binop: binop.clone(),
                     src: *src,
                     dst: OperandAsm::Reg { r: Register::R11 },
                 },

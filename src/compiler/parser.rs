@@ -203,8 +203,6 @@ pub enum BinaryOp {
     BitwiseAnd,
     BitwiseOr,
     BitwiseXor,
-    ShiftRight,
-    ShiftLeft,
 }
 
 impl Display for BinaryOp {
@@ -218,8 +216,6 @@ impl Display for BinaryOp {
             Self::BitwiseAnd => write!(f, "Bitwise 'and'"),
             Self::BitwiseOr => write!(f, "Bitwise 'or'"),
             Self::BitwiseXor => write!(f, "Bitwise 'xor'"),
-            Self::ShiftRight => write!(f, "Shift right"),
-            Self::ShiftLeft => write!(f, "Shift left"),
         }
     }
 }
@@ -235,8 +231,6 @@ impl BinaryOp {
             Token::Ampersand => Ok(Self::BitwiseAnd),
             Token::Pipe => Ok(Self::BitwiseOr),
             Token::Caret => Ok(Self::BitwiseXor),
-            Token::GtGt => Ok(Self::ShiftRight),
-            Token::LtLt => Ok(Self::ShiftLeft),
             _ => Err(ParseError::InvalidSyntax {
                 got: token,
                 expected: Token::Plus,
@@ -248,7 +242,6 @@ impl BinaryOp {
             Token::Pipe => 0,
             Token::Caret => 1,
             Token::Ampersand => 2,
-            Token::GtGt | Token::LtLt => 3,
             Token::Plus | Token::Minus => 4,
             Token::Asterisk | Token::FSlash | Token::Percent => 5,
             _ => 255,
@@ -380,8 +373,6 @@ fn parse_exp(
                 | Token::Ampersand
                 | Token::Pipe
                 | Token::Caret
-                | Token::GtGt
-                | Token::LtLt
         ) && BinaryOp::token_prec(&t) >= min_prec
     }) {
         let prec = BinaryOp::token_prec(&next_token) + 1;

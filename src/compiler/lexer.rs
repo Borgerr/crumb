@@ -53,8 +53,6 @@ pub enum Token {
     Ampersand,                  // &
     Pipe,                       // |
     Caret,                      // ^
-    GtGt,                       // >>
-    LtLt,                       // <<
 }
 
 impl Display for Token {
@@ -79,8 +77,6 @@ impl Display for Token {
             Token::Ampersand => write!(f, "& symbol"),
             Token::Pipe => write!(f, "| symbol"),
             Token::Caret => write!(f, "^ symbol"),
-            Token::GtGt => write!(f, ">> symbol"),
-            Token::LtLt => write!(f, "<< symbol"),
         }
     }
 }
@@ -105,8 +101,6 @@ impl FromStr for Token {
             r"&" => Ok(Self::Ampersand),
             r"|" => Ok(Self::Pipe),
             r"^" => Ok(Self::Caret),
-            r">>" => Ok(Self::GtGt),
-            r"<<" => Ok(Self::LtLt),
             _ => Err(LexError::Unrecognized {
                 strang: s.to_string(),
             }),
@@ -219,7 +213,7 @@ fn test_parenthesis() {
 /// BE SURE TO CHANGE THIS TEST WITH MORE OPERATORS
 #[test]
 fn test_lex_operators() {
-    let source = String::from(r"( ) { } ; - -- ~ + * / % & | ^ >> <<");
+    let source = String::from(r"( ) { } ; - -- ~ + * / % & | ^");
     let tokens = tokenize(source).unwrap();
     let expected = vec![
         Token::OpenParens,
@@ -237,8 +231,6 @@ fn test_lex_operators() {
         Token::Ampersand,
         Token::Pipe,
         Token::Caret,
-        Token::GtGt,
-        Token::LtLt,
     ];
     assert_eq!(tokens, expected);
 }
