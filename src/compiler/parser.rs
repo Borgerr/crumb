@@ -203,6 +203,14 @@ pub enum BinaryOp {
     BitwiseAnd,
     BitwiseOr,
     BitwiseXor,
+    And,
+    Or,
+    Equal,
+    Leq,
+    Geq,
+    LessThan,
+    GreaterThan,
+    NotEqual,
 }
 
 impl Display for BinaryOp {
@@ -216,6 +224,14 @@ impl Display for BinaryOp {
             Self::BitwiseAnd => write!(f, "Bitwise 'and'"),
             Self::BitwiseOr => write!(f, "Bitwise 'or'"),
             Self::BitwiseXor => write!(f, "Bitwise 'xor'"),
+            Self::And => write!(f, "Logical 'and'"),
+            Self::Or => write!(f, "Logical 'or'"),
+            Self::Equal => write!(f, "Logical 'equals'"),
+            Self::Leq => write!(f, "Logical 'less than or equal'"),
+            Self::Geq => write!(f, "Logical 'greather than or equal'"),
+            Self::LessThan => write!(f, "Logical 'less than'"),
+            Self::GreaterThan => write!(f, "Logical 'greater than'"),
+            Self::NotEqual => write!(f, "Logical 'not equal'"),
         }
     }
 }
@@ -231,6 +247,14 @@ impl BinaryOp {
             Token::Ampersand => Ok(Self::BitwiseAnd),
             Token::Pipe => Ok(Self::BitwiseOr),
             Token::Caret => Ok(Self::BitwiseXor),
+            Token::AmpersandAmpersand => Ok(Self::And),
+            Token::PipePipe => Ok(Self::Or),
+            Token::DoubleEqual => Ok(Self::Equal),
+            Token::Leq => Ok(Self::Leq),
+            Token::Geq => Ok(Self::Geq),
+            Token::LessThan => Ok(Self::LessThan),
+            Token::GreaterThan => Ok(Self::GreaterThan),
+            Token::BangEq => Ok(Self::NotEqual),
             _ => Err(ParseError::InvalidSyntax {
                 got: token,
                 expected: Token::Plus,
@@ -239,11 +263,15 @@ impl BinaryOp {
     }
     fn token_prec(token: &Token) -> u8 {
         match token {
-            Token::Pipe => 0,
-            Token::Caret => 1,
-            Token::Ampersand => 2,
-            Token::Plus | Token::Minus => 4,
-            Token::Asterisk | Token::FSlash | Token::Percent => 5,
+            Token::PipePipe => 0,
+            Token::AmpersandAmpersand => 1,
+            Token::Pipe => 2,
+            Token::Caret => 3,
+            Token::Ampersand => 4,
+            Token::DoubleEqual | Token::BangEq => 5,
+            Token::Leq | Token::Geq | Token::LessThan | Token::GreaterThan => 6,
+            Token::Plus | Token::Minus => 7,
+            Token::Asterisk | Token::FSlash | Token::Percent => 8,
             _ => 255,
         }
     }
@@ -274,10 +302,12 @@ impl Display for FactorC {
 /// Abstract C unary operation.
 /// - `~`: bitwise complement
 /// - `-`: integer negation
+/// - `!`: logical negation
 #[derive(PartialEq, Debug, Clone)]
 pub enum UnaryOp {
     Negate,
     BitwiseComplement,
+    Not,
 }
 
 impl Display for UnaryOp {
@@ -285,6 +315,21 @@ impl Display for UnaryOp {
         match self {
             Self::Negate => write!(f, "UnaryOp::Negate"),
             Self::BitwiseComplement => write!(f, "UnaryOp::BitwiseComplement"),
+            Self::Not => write!(f, "UnaryOp::Not"),
+        }
+    }
+}
+
+impl UnaryOp {
+    fn from(token: Token) -> ParseResult<Self> {
+        match token {
+            Token::Minus => Ok(Self::Negate),
+            Token::Tilde => Ok(Self::BitwiseComplement),
+            Token::Bang => Ok(Self::Not),
+            _ => Err(ParseError::InvalidSyntax {
+                got: token,
+                expected: Token::Plus,
+            }),
         }
     }
 }
@@ -362,19 +407,9 @@ fn parse_exp(
         fac: Box::new(parse_factor(tokens)?),
     };
 
-    while let Some(next_token) = tokens.next_if(|t| {
-        matches!(
-            t,
-            Token::Plus
-                | Token::Minus
-                | Token::Asterisk
-                | Token::FSlash
-                | Token::Percent
-                | Token::Ampersand
-                | Token::Pipe
-                | Token::Caret
-        ) && BinaryOp::token_prec(&t) >= min_prec
-    }) {
+    while let Some(next_token) = tokens
+        .next_if(|t| BinaryOp::from(t.clone()).is_ok() && BinaryOp::token_prec(&t) >= min_prec)
+    {
         let prec = BinaryOp::token_prec(&next_token) + 1;
         left = ExpC::Binary {
             op: BinaryOp::from(next_token)?,
@@ -390,12 +425,8 @@ fn parse_factor(tokens: &mut Peekable<&mut impl Iterator<Item = Token>>) -> Pars
     let got = expect_token(tokens, String::from("parse_factor"))?;
     match got {
         Token::Constant { val } => Ok(FactorC::Const { c: val }),
-        Token::Tilde => Ok(FactorC::Unary {
-            op: UnaryOp::BitwiseComplement,
-            fac: Box::new(parse_factor(tokens)?),
-        }),
-        Token::Minus => Ok(FactorC::Unary {
-            op: UnaryOp::Negate,
+        Token::Tilde | Token::Minus | Token::Bang => Ok(FactorC::Unary {
+            op: UnaryOp::from(got)?,
             fac: Box::new(parse_factor(tokens)?),
         }),
         Token::OpenParens => {
@@ -699,6 +730,161 @@ fn test_negate_one_plus_one() {
             op: BinaryOp::Add,
             l_exp: Box::new(Exp::Const { c: 1 }),
             r_exp: Box::new(Exp::Const { c: 1 }),
+        }),
+    };
+    assert_eq!(res, expected);
+}
+
+/// tests the parsing of `~(1 + 1)`
+#[test]
+fn test_cmp_one_plus_one() {
+    let tokens = &mut vec![
+        Token::Tilde,
+        Token::OpenParens,
+        Token::Constant { val: 1 },
+        Token::Plus,
+        Token::Constant { val: 1 },
+        Token::CloseParens,
+    ]
+    .into_iter();
+    let res = parse_exp(&mut tokens.peekable(), 0);
+    let res = Exp::from_expc(res.unwrap());
+    let expected = Exp::Unary {
+        op: UnaryOp::BitwiseComplement,
+        exp: Box::new(Exp::Binary {
+            op: BinaryOp::Add,
+            l_exp: Box::new(Exp::Const { c: 1 }),
+            r_exp: Box::new(Exp::Const { c: 1 }),
+        }),
+    };
+    assert_eq!(res, expected);
+}
+
+/// tests the parsing of `!(1 + 1)`
+#[test]
+fn test_not_one_plus_one() {
+    let tokens = &mut vec![
+        Token::Bang,
+        Token::OpenParens,
+        Token::Constant { val: 1 },
+        Token::Plus,
+        Token::Constant { val: 1 },
+        Token::CloseParens,
+    ]
+    .into_iter();
+    let res = parse_exp(&mut tokens.peekable(), 0);
+    let res = Exp::from_expc(res.unwrap());
+    let expected = Exp::Unary {
+        op: UnaryOp::Not,
+        exp: Box::new(Exp::Binary {
+            op: BinaryOp::Add,
+            l_exp: Box::new(Exp::Const { c: 1 }),
+            r_exp: Box::new(Exp::Const { c: 1 }),
+        }),
+    };
+    assert_eq!(res, expected);
+}
+
+/// tests the parsing of `1 && 2`
+#[test]
+fn test_one_and_two() {
+    let tokens = &mut vec![
+        Token::Constant { val: 1 },
+        Token::AmpersandAmpersand,
+        Token::Constant { val: 2 },
+    ]
+    .into_iter();
+    let res = parse_exp(&mut tokens.peekable(), 0);
+    let res = Exp::from_expc(res.unwrap());
+    let expected = Exp::Binary {
+        op: BinaryOp::And,
+        l_exp: Box::new(Exp::Const { c: 1 }),
+        r_exp: Box::new(Exp::Const { c: 2 }),
+    };
+    assert_eq!(res, expected);
+}
+
+/// tests the parsing of `!(1 && 2)`
+#[test]
+fn test_not_one_and_two() {
+    let tokens = &mut vec![
+        Token::Bang,
+        Token::OpenParens,
+        Token::Constant { val: 1 },
+        Token::AmpersandAmpersand,
+        Token::Constant { val: 2 },
+        Token::CloseParens,
+    ]
+    .into_iter();
+    let res = parse_exp(&mut tokens.peekable(), 0);
+    let res = Exp::from_expc(res.unwrap());
+    let expected = Exp::Unary {
+        op: UnaryOp::Not,
+        exp: Box::new(Exp::Binary {
+            op: BinaryOp::And,
+            l_exp: Box::new(Exp::Const { c: 1 }),
+            r_exp: Box::new(Exp::Const { c: 2 }),
+        }),
+    };
+    assert_eq!(res, expected);
+}
+
+/// tests the parsing of `1 + 2 && 3 || 4 == 5 - 6 * 7 / 8 ^ 9`
+#[test]
+fn test_big_binary_exp() {
+    let tokens = &mut vec![
+        Token::Constant { val: 1 },
+        Token::Plus,
+        Token::Constant { val: 2 },
+        Token::AmpersandAmpersand,
+        Token::Constant { val: 3 },
+        Token::PipePipe,
+        Token::Constant { val: 4 },
+        Token::DoubleEqual,
+        Token::Constant { val: 5 },
+        Token::Minus,
+        Token::Constant { val: 6 },
+        Token::Asterisk,
+        Token::Constant { val: 7 },
+        Token::FSlash,
+        Token::Constant { val: 8 },
+        Token::Caret,
+        Token::Constant { val: 9 },
+    ]
+    .into_iter();
+    let res = parse_exp(&mut tokens.peekable(), 0);
+    let res = Exp::from_expc(res.unwrap());
+    let expected = Exp::Binary {
+        op: BinaryOp::Or,
+        l_exp: Box::new(Exp::Binary {
+            op: BinaryOp::And,
+            l_exp: Box::new(Exp::Binary {
+                op: BinaryOp::Add,
+                l_exp: Box::new(Exp::Const { c: 1 }),
+                r_exp: Box::new(Exp::Const { c: 2 }),
+            }),
+            r_exp: Box::new(Exp::Const { c: 3 }),
+        }),
+        r_exp: Box::new(Exp::Binary {
+            op: BinaryOp::BitwiseXor,
+            l_exp: Box::new(Exp::Binary {
+                op: BinaryOp::Equal,
+                l_exp: Box::new(Exp::Const { c: 4 }),
+                r_exp: Box::new(Exp::Binary {
+                    op: BinaryOp::Subtract,
+                    l_exp: Box::new(Exp::Const { c: 5 }),
+                    r_exp: Box::new(Exp::Binary {
+                        op: BinaryOp::Divide,
+                        l_exp: Box::new(Exp::Binary {
+                            op: BinaryOp::Multiply,
+                            l_exp: Box::new(Exp::Const { c: 6 }),
+                            r_exp: Box::new(Exp::Const { c: 7 }),
+                        }),
+                        r_exp: Box::new(Exp::Const { c: 8 }),
+                    }),
+                }),
+            }),
+            r_exp: Box::new(Exp::Const { c: 9 }),
         }),
     };
     assert_eq!(res, expected);

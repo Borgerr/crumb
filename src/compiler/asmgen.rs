@@ -99,6 +99,7 @@ impl Display for InstructionAsm {
             Self::Unary { unop, operand } => match unop {
                 UnaryOp::Negate => write!(f, "negl {}", operand),
                 UnaryOp::BitwiseComplement => write!(f, "notl {}", operand),
+                UnaryOp::Not => todo!(),
             },
             Self::AllocStack { off } => write!(f, "subq ${}, %rsp", -1 * off),
             Self::Cdq => write!(f, "cdq"),
