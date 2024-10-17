@@ -16,9 +16,9 @@ use crate::Args;
 
 #[derive(Error, Debug)]
 pub enum CompileError {
-    Lex(lexer::LexError),
-    Parse(parser::ParseError),
-    FileIo(std::io::Error),
+    Lex(#[from] lexer::LexError),
+    Parse(#[from] parser::ParseError),
+    FileIo(#[from] std::io::Error),
 }
 
 impl Display for CompileError {
@@ -38,46 +38,32 @@ impl Display for CompileError {
 /// - p: bool, stop after parsing
 /// - c: bool, stop after assembly code generation
 pub fn compile(input_file: String, args: Args) -> Result<String, CompileError> {
-    let source = match fs::read_to_string(format!("{}.i", input_file)) {
-        Ok(s) => s,
-        Err(e) => return Err(CompileError::FileIo(e)),
-    };
+    let source = fs::read_to_string(format!("{}.i", input_file))?;
 
-    let tokens = match tokenize(source) {
-        Err(e) => return Err(CompileError::Lex(e)),
-        Ok(ts) => {
-            if args.lex {
-                ts.into_iter().for_each(|t| println!("TOKEN!!! {}", t));
-                return Ok(String::from("magic words"));
-            } else {
-                ts
-            }
-        }
-    };
+    let tokens = tokenize(source)?;
+    if args.lex {
+        tokens.into_iter().for_each(|t| println!("TOKEN!!! {}", t));
+        return Ok(String::from("magic words"));
+    }
 
-    let c_ast = match parse(tokens) {
-        Err(e) => return Err(CompileError::Parse(e)),
-        Ok(ast) => {
-            if args.parse {
-                println!("VALID AST RETURNED: {}", ast);
-                return Ok(String::from("magic words"));
-            } else {
-                ast
-            }
-        }
-    };
+    let c_ast = parse(tokens)?;
+    if args.parse {
+        println!("VALID AST RETURNED: {}", c_ast);
+        return Ok(String::from("magic words"));
+    }
+
     let tacky = tacky::TackyEmitter::gen_tacky(c_ast);
     if args.tacky {
         return Ok(String::from("magic words"));
     }
+
     let asm_ast = gen_asm(tacky);
     if args.codegen {
         println!("GENERATED ASSEMBLY: {}", asm_ast);
         return Ok(String::from("magic words"));
     }
-    if let Err(e) = emit_asm(asm_ast, format!("{}.s", input_file)) {
-        return Err(CompileError::FileIo(e));
-    }
+
+    emit_asm(asm_ast, format!("{}.s", input_file))?;
 
     Ok(format!("{}.s", input_file))
 }
