@@ -16,17 +16,17 @@ use crate::Args;
 
 #[derive(Error, Debug)]
 pub enum CompileError {
-    Lex { e: lexer::LexError },
-    Parse { e: parser::ParseError },
-    FileIo { e: std::io::Error },
+    Lex(lexer::LexError),
+    Parse(parser::ParseError),
+    FileIo(std::io::Error),
 }
 
 impl Display for CompileError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Lex { e } => write!(f, "{}", e),
-            Self::Parse { e } => write!(f, "{}", e),
-            Self::FileIo { e } => write!(f, "{}", e),
+            Self::Lex(e) => write!(f, "{}", e),
+            Self::Parse(e) => write!(f, "{}", e),
+            Self::FileIo(e) => write!(f, "{}", e),
         }
     }
 }
@@ -40,11 +40,11 @@ impl Display for CompileError {
 pub fn compile(input_file: String, args: Args) -> Result<String, CompileError> {
     let source = match fs::read_to_string(format!("{}.i", input_file)) {
         Ok(s) => s,
-        Err(e) => return Err(CompileError::FileIo { e }),
+        Err(e) => return Err(CompileError::FileIo(e)),
     };
 
     let tokens = match tokenize(source) {
-        Err(e) => return Err(CompileError::Lex { e }),
+        Err(e) => return Err(CompileError::Lex(e)),
         Ok(ts) => {
             if args.lex {
                 ts.into_iter().for_each(|t| println!("TOKEN!!! {}", t));
@@ -56,7 +56,7 @@ pub fn compile(input_file: String, args: Args) -> Result<String, CompileError> {
     };
 
     let c_ast = match parse(tokens) {
-        Err(e) => return Err(CompileError::Parse { e }),
+        Err(e) => return Err(CompileError::Parse(e)),
         Ok(ast) => {
             if args.parse {
                 println!("VALID AST RETURNED: {}", ast);
@@ -76,7 +76,7 @@ pub fn compile(input_file: String, args: Args) -> Result<String, CompileError> {
         return Ok(String::from("magic words"));
     }
     if let Err(e) = emit_asm(asm_ast, format!("{}.s", input_file)) {
-        return Err(CompileError::FileIo { e });
+        return Err(CompileError::FileIo(e));
     }
 
     Ok(format!("{}.s", input_file))
