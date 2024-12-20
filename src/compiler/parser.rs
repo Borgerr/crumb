@@ -120,6 +120,12 @@ pub enum Exp {
     },
 }
 
+impl Into<Exp> for i32 {
+    fn into(self) -> Exp {
+        Exp::Const { c: self }
+    }
+}
+
 impl Display for Exp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -149,7 +155,7 @@ impl Exp {
     }
     fn from_factc(factc: FactorC) -> Self {
         match factc {
-            FactorC::Const { c } => Self::Const { c },
+            FactorC::Const { c } => c.into(),
             FactorC::Unary { op, fac } => Self::Unary {
                 op,
                 exp: Box::new(Self::from_factc(*fac)),
