@@ -308,7 +308,7 @@ fn translate_and() {
         },
         InstructionTacky::JumpIfZero {
             src: ValTacky::TmpVar { no: 1 },
-            target: Identifier::from("false_label"),
+            target: Identifier::from("false_label0"),
         },
         InstructionTacky::Copy {
             src: 2.into(),
@@ -317,21 +317,21 @@ fn translate_and() {
         // following evaluating the second expression; do we need to change to some tmp var?
         InstructionTacky::JumpIfZero {
             src: ValTacky::TmpVar { no: 2 },
-            target: Identifier::from("false_label"),
+            target: Identifier::from("false_label0"),
         },
         InstructionTacky::Copy {
             src: 1.into(),
-            dst: ValTacky::TmpVar { no: 3 }, // TODO: change to some sort of result enum or string
+            dst: ValTacky::TmpVar { no: 3 },
         },
         InstructionTacky::Jump {
-            target: Identifier::from("end"),
+            target: Identifier::from("end0"),
         },
-        InstructionTacky::Label(Identifier::from("false_label")),
+        InstructionTacky::Label(Identifier::from("false_label0")),
         InstructionTacky::Copy {
             src: 0.into(),
             dst: ValTacky::TmpVar { no: 3 },
         },
-        InstructionTacky::Label(Identifier::from("end")),
+        InstructionTacky::Label(Identifier::from("end0")),
     ];
 
     assert_eq!(TackyEmitter::new().translate_statement(statement), instrs);
