@@ -349,6 +349,75 @@ fn translate_and() {
             dst: ValTacky::TmpVar { no: 3 },
         },
         InstructionTacky::Label(Identifier::from("end0")),
+        InstructionTacky::Ret {
+            v: ValTacky::TmpVar { no: 3 },
+        },
+    ];
+
+    assert_eq!(TackyEmitter::new().translate_statement(statement), instrs);
+}
+
+/// ## TESTS THE FOLLOWING TRANSLATION
+/// ## C (AST input):
+/// ```c
+/// return 1 || 2;
+/// ```
+/// ### TACKY (output):
+/// ```text
+/// v1 = 1
+/// JumpIfNotZero(v1, true_label0)
+/// v2 = 2
+/// JumpIfNotZero(v2, true_label0)
+/// result = 0
+/// Jump(end0)
+/// Label(true_label0)
+/// result = 1
+/// Label(end0)
+/// ```
+#[test]
+fn translate_or() {
+    let statement = StatementC::Return {
+        exp: Box::new(Exp::Binary {
+            op: BinaryOp::Or,
+            l_exp: Box::new(1.into()),
+            r_exp: Box::new(2.into()),
+        }),
+    };
+    let instrs = vec![
+        // following evaluating the first expression; do we need to change to some tmp var?
+        InstructionTacky::Copy {
+            src: 1.into(),
+            dst: ValTacky::TmpVar { no: 1 },
+        },
+        InstructionTacky::JumpIfNotZero {
+            src: ValTacky::TmpVar { no: 1 },
+            target: Identifier::from("true_label0"),
+        },
+        InstructionTacky::Copy {
+            src: 2.into(),
+            dst: ValTacky::TmpVar { no: 2 },
+        },
+        // following evaluating the second expression; do we need to change to some tmp var?
+        InstructionTacky::JumpIfNotZero {
+            src: ValTacky::TmpVar { no: 2 },
+            target: Identifier::from("true_label0"),
+        },
+        InstructionTacky::Copy {
+            src: 0.into(),
+            dst: ValTacky::TmpVar { no: 3 },
+        },
+        InstructionTacky::Jump {
+            target: Identifier::from("end0"),
+        },
+        InstructionTacky::Label(Identifier::from("true_label0")),
+        InstructionTacky::Copy {
+            src: 1.into(),
+            dst: ValTacky::TmpVar { no: 3 },
+        },
+        InstructionTacky::Label(Identifier::from("end0")),
+        InstructionTacky::Ret {
+            v: ValTacky::TmpVar { no: 3 },
+        },
     ];
 
     assert_eq!(TackyEmitter::new().translate_statement(statement), instrs);
