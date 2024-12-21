@@ -85,12 +85,20 @@ impl Into<ValTacky> for i32 {
 /// Keeps track of various data
 /// within TACKY representation.
 pub struct TackyEmitter {
-    tmp_no: u16,
+    tmpvar_no: u16,
+    false_no: u16,
+    true_no: u16,
+    end_no: u16,
 }
 
 impl TackyEmitter {
     pub fn new() -> Self {
-        TackyEmitter { tmp_no: 0 }
+        TackyEmitter {
+            tmpvar_no: 0,
+            false_no: 0,
+            true_no: 0,
+            end_no: 0,
+        }
     }
     pub fn gen_tacky(cprog: ProgramC) -> ProgramTacky {
         ProgramTacky {
@@ -129,26 +137,142 @@ impl TackyEmitter {
                 });
                 dst
             }
-            Exp::Binary { op, l_exp, r_exp } => {
-                let src1 = self.translate_expression(*l_exp, instrs);
-                let src2 = self.translate_expression(*r_exp, instrs);
-                let dst = self.get_new_tmpvar();
-                instrs.push(InstructionTacky::Binary {
-                    op,
-                    src1,
-                    src2,
-                    dst: dst.clone(),
-                });
-                dst
-            }
+            Exp::Binary { op, l_exp, r_exp } => match op {
+                BinaryOp::And => self.translate_and(*l_exp, *r_exp, instrs),
+                BinaryOp::Or => self.translate_or(*l_exp, *r_exp, instrs),
+                _ => {
+                    let src1 = self.translate_expression(*l_exp, instrs);
+                    let src2 = self.translate_expression(*r_exp, instrs);
+                    let dst = self.get_new_tmpvar();
+                    instrs.push(InstructionTacky::Binary {
+                        op,
+                        src1,
+                        src2,
+                        dst: dst.clone(),
+                    });
+                    dst
+                }
+            },
         }
     }
 
+    /// Translates `&&`, or logical and, in a lazy way.
+    fn translate_and(
+        &mut self,
+        l_exp: Exp,
+        r_exp: Exp,
+        instrs: &mut Vec<InstructionTacky>,
+    ) -> ValTacky {
+        let src1 = self.translate_expression(l_exp, instrs);
+        let src2 = self.translate_expression(r_exp, instrs);
+        let copy1 = self.get_new_tmpvar();
+        let copy2 = self.get_new_tmpvar();
+        let copy3 = self.get_new_tmpvar();
+        let false_label = self.get_new_falselabel();
+        let end_label = self.get_new_endlabel();
+
+        instrs.append(&mut vec![
+            InstructionTacky::Copy {
+                src: src1,
+                dst: copy1.clone(),
+            },
+            InstructionTacky::JumpIfZero {
+                src: copy1.clone(),
+                target: false_label.clone(),
+            },
+            InstructionTacky::Copy {
+                src: src2,
+                dst: copy2.clone(),
+            },
+            InstructionTacky::JumpIfZero {
+                src: copy2.clone(),
+                target: false_label.clone(),
+            },
+            InstructionTacky::Copy {
+                src: 1.into(),
+                dst: copy3.clone(),
+            },
+            InstructionTacky::Jump {
+                target: end_label.clone(),
+            },
+            InstructionTacky::Label(false_label),
+            InstructionTacky::Copy {
+                src: 0.into(),
+                dst: copy3.clone(),
+            },
+            InstructionTacky::Label(end_label),
+        ]);
+
+        copy3
+    }
+
+    /// Translates `||`, or logical or, in a lazy way.
+    fn translate_or(
+        &mut self,
+        l_exp: Exp,
+        r_exp: Exp,
+        instrs: &mut Vec<InstructionTacky>,
+    ) -> ValTacky {
+        let src1 = self.translate_expression(l_exp, instrs);
+        let src2 = self.translate_expression(r_exp, instrs);
+        let copy1 = self.get_new_tmpvar();
+        let copy2 = self.get_new_tmpvar();
+        let copy3 = self.get_new_tmpvar();
+        let true_label = self.get_new_truelabel();
+        let end_label = self.get_new_endlabel();
+
+        instrs.append(&mut vec![
+            InstructionTacky::Copy {
+                src: src1,
+                dst: copy1.clone(),
+            },
+            InstructionTacky::JumpIfNotZero {
+                src: copy1.clone(),
+                target: true_label.clone(),
+            },
+            InstructionTacky::Copy {
+                src: src2,
+                dst: copy2.clone(),
+            },
+            InstructionTacky::JumpIfNotZero {
+                src: copy2.clone(),
+                target: true_label.clone(),
+            },
+            InstructionTacky::Copy {
+                src: 0.into(),
+                dst: copy3.clone(),
+            },
+            InstructionTacky::Jump {
+                target: end_label.clone(),
+            },
+            InstructionTacky::Label(true_label),
+            InstructionTacky::Copy {
+                src: 1.into(),
+                dst: copy3.clone(),
+            },
+            InstructionTacky::Label(end_label),
+        ]);
+
+        copy3
+    }
+
     fn get_new_tmpvar(&mut self) -> ValTacky {
-        self.tmp_no += 1;
+        self.tmpvar_no += 1;
         ValTacky::TmpVar {
-            no: self.tmp_no - 1,
+            no: self.tmpvar_no - 1,
         }
+    }
+    fn get_new_falselabel(&mut self) -> Identifier {
+        self.false_no += 1;
+        format!("false_label{}", self.false_no - 1)
+    }
+    fn get_new_truelabel(&mut self) -> Identifier {
+        self.true_no += 1;
+        format!("true_label{}", self.true_no - 1)
+    }
+    fn get_new_endlabel(&mut self) -> Identifier {
+        self.end_no += 1;
+        format!("end{}", self.end_no - 1)
     }
 }
 
@@ -321,24 +445,24 @@ fn translate_and() {
         // following evaluating the first expression; do we need to change to some tmp var?
         InstructionTacky::Copy {
             src: 1.into(),
+            dst: ValTacky::TmpVar { no: 0 },
+        },
+        InstructionTacky::JumpIfZero {
+            src: ValTacky::TmpVar { no: 0 },
+            target: Identifier::from("false_label0"),
+        },
+        InstructionTacky::Copy {
+            src: 2.into(),
             dst: ValTacky::TmpVar { no: 1 },
         },
+        // following evaluating the second expression; do we need to change to some tmp var?
         InstructionTacky::JumpIfZero {
             src: ValTacky::TmpVar { no: 1 },
             target: Identifier::from("false_label0"),
         },
         InstructionTacky::Copy {
-            src: 2.into(),
-            dst: ValTacky::TmpVar { no: 2 },
-        },
-        // following evaluating the second expression; do we need to change to some tmp var?
-        InstructionTacky::JumpIfZero {
-            src: ValTacky::TmpVar { no: 2 },
-            target: Identifier::from("false_label0"),
-        },
-        InstructionTacky::Copy {
             src: 1.into(),
-            dst: ValTacky::TmpVar { no: 3 },
+            dst: ValTacky::TmpVar { no: 2 },
         },
         InstructionTacky::Jump {
             target: Identifier::from("end0"),
@@ -346,11 +470,11 @@ fn translate_and() {
         InstructionTacky::Label(Identifier::from("false_label0")),
         InstructionTacky::Copy {
             src: 0.into(),
-            dst: ValTacky::TmpVar { no: 3 },
+            dst: ValTacky::TmpVar { no: 2 },
         },
         InstructionTacky::Label(Identifier::from("end0")),
         InstructionTacky::Ret {
-            v: ValTacky::TmpVar { no: 3 },
+            v: ValTacky::TmpVar { no: 2 },
         },
     ];
 
@@ -387,24 +511,24 @@ fn translate_or() {
         // following evaluating the first expression; do we need to change to some tmp var?
         InstructionTacky::Copy {
             src: 1.into(),
+            dst: ValTacky::TmpVar { no: 0 },
+        },
+        InstructionTacky::JumpIfNotZero {
+            src: ValTacky::TmpVar { no: 0 },
+            target: Identifier::from("true_label0"),
+        },
+        InstructionTacky::Copy {
+            src: 2.into(),
             dst: ValTacky::TmpVar { no: 1 },
         },
+        // following evaluating the second expression; do we need to change to some tmp var?
         InstructionTacky::JumpIfNotZero {
             src: ValTacky::TmpVar { no: 1 },
             target: Identifier::from("true_label0"),
         },
         InstructionTacky::Copy {
-            src: 2.into(),
-            dst: ValTacky::TmpVar { no: 2 },
-        },
-        // following evaluating the second expression; do we need to change to some tmp var?
-        InstructionTacky::JumpIfNotZero {
-            src: ValTacky::TmpVar { no: 2 },
-            target: Identifier::from("true_label0"),
-        },
-        InstructionTacky::Copy {
             src: 0.into(),
-            dst: ValTacky::TmpVar { no: 3 },
+            dst: ValTacky::TmpVar { no: 2 },
         },
         InstructionTacky::Jump {
             target: Identifier::from("end0"),
@@ -412,11 +536,11 @@ fn translate_or() {
         InstructionTacky::Label(Identifier::from("true_label0")),
         InstructionTacky::Copy {
             src: 1.into(),
-            dst: ValTacky::TmpVar { no: 3 },
+            dst: ValTacky::TmpVar { no: 2 },
         },
         InstructionTacky::Label(Identifier::from("end0")),
         InstructionTacky::Ret {
-            v: ValTacky::TmpVar { no: 3 },
+            v: ValTacky::TmpVar { no: 2 },
         },
     ];
 
