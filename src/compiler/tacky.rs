@@ -291,6 +291,23 @@ fn translate_one_plus_one() {
     );
 }
 
+/// ## TESTS THE FOLLOWING TRANSLATION
+/// ## C (AST input):
+/// ```c
+/// return 1 && 2;
+/// ```
+/// ### TACKY (output):
+/// ```text
+/// v1 = 1
+/// JumpIfZero(v1, false_label0)
+/// v2 = 2
+/// JumpIfZero(v2, false_label0)
+/// result = 1
+/// Jump(end0)
+/// Label(false_label0)
+/// result = 0
+/// Label(end0)
+/// ```
 #[test]
 fn translate_and() {
     let statement = StatementC::Return {
