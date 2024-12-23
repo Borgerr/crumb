@@ -36,6 +36,38 @@ macro_rules! basic_mainret {
     };
 }
 
+fn logical_op(left: u8, right: u8, op: fn(u8, u8) -> bool) -> i8 {
+    if op(left, right) {
+        1
+    } else {
+        0
+    }
+}
+fn logical_and(left: u8, right: u8) -> i8 {
+    logical_op(left, right, |l: u8, r: u8| (l != 0) && (r != 0))
+}
+fn logical_or(left: u8, right: u8) -> i8 {
+    logical_op(left, right, |l: u8, r: u8| (l != 0) || (r != 0))
+}
+fn logical_lt(left: u8, right: u8) -> i8 {
+    logical_op(left, right, |l: u8, r: u8| l < r)
+}
+fn logical_gt(left: u8, right: u8) -> i8 {
+    logical_op(left, right, |l: u8, r: u8| l > r)
+}
+fn logical_lte(left: u8, right: u8) -> i8 {
+    logical_op(left, right, |l: u8, r: u8| l <= r)
+}
+fn logical_gte(left: u8, right: u8) -> i8 {
+    logical_op(left, right, |l: u8, r: u8| l >= r)
+}
+fn logical_eq(left: u8, right: u8) -> i8 {
+    logical_op(left, right, |l: u8, r: u8| l == r)
+}
+fn logical_neq(left: u8, right: u8) -> i8 {
+    logical_op(left, right, |l: u8, r: u8| l != r)
+}
+
 basic_mainret!(return_basic_neg_two, "-2", -2);
 basic_mainret!(return_basic_cmp_two, "~2", !2);
 basic_mainret!(return_negneg_two, "-(-2)", -(-2));
@@ -89,3 +121,13 @@ basic_mainret!(
     "1 + 2 | 2 + 1",
     1 + 2 | 2 + 1
 );
+
+basic_mainret!(return_one_logand_two, "1 && 2", logical_and(1, 2));
+basic_mainret!(return_one_logor_two, "1 || 2", logical_or(1, 2));
+basic_mainret!(return_one_logeq_two, "1 == 2", logical_eq(1, 2));
+basic_mainret!(return_one_logeq_one, "1 == 1", logical_eq(1, 1));
+basic_mainret!(return_one_logneq_two, "1 != 2", logical_neq(1, 2));
+basic_mainret!(return_one_loggt_two, "1 > 2", logical_gt(1, 2));
+basic_mainret!(return_one_loglt_two, "1 < 2", logical_lt(1, 2));
+basic_mainret!(return_one_loglte_two, "1 <= 2", logical_lte(1, 2));
+basic_mainret!(return_one_loggte_two, "1 >= 2", logical_gte(1, 2));
