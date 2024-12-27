@@ -56,7 +56,7 @@ impl Display for FunDefAsm {
 }
 
 /// x86-64 instruction
-/// ### Grammar as of v0.1.2
+/// ### Grammar as of v0.1.3
 /// ```text
 /// instruction = Mov(operand src, operand dst)
 ///             | Unary(unary_operator, operand)
@@ -65,6 +65,11 @@ impl Display for FunDefAsm {
 ///             | Cdq
 ///             | AllocateStack(int)
 ///             | Ret
+///             | Cmp(operand, operand)
+///             | Jmp(identifier)
+///             | JmpCC(cond_code, identifier)
+///             | SetCC(cond_code, operand)
+///             | Label(identifier)
 /// ```
 #[derive(PartialEq, Debug, Clone)]
 pub enum InstructionAsm {
@@ -89,6 +94,14 @@ pub enum InstructionAsm {
         operand: OperandAsm,
     },
     Cdq,
+    Cmp {
+        op1: OperandAsm,
+        op2: OperandAsm,
+    },
+    Jmp(Identifier),
+    JmpCC(CondCode, Identifier),
+    SetCC(CondCode, OperandAsm),
+    Label(Identifier),
 }
 
 impl Display for InstructionAsm {
@@ -116,6 +129,7 @@ impl Display for InstructionAsm {
                 ),
             },
             Self::Idiv { operand } => write!(f, "idivl {}", operand),
+            _ => todo!("implement for other instructions"),
         }
     }
 }
@@ -166,6 +180,30 @@ impl Display for Register {
             Self::DX => write!(f, "%edx"),
             Self::R11 => write!(f, "%r11d"),
         }
+    }
+}
+
+/// x86-64 condition codes
+/// ### Used Condition codes as of v0.1.2
+/// - Equal
+/// - Not equal
+/// - Greater
+/// - Greater or equal
+/// - Less
+/// - Less or equal
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum CondCode {
+    E,
+    NE,
+    G,
+    GE,
+    L,
+    LE,
+}
+
+impl Display for CondCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
     }
 }
 
@@ -345,6 +383,7 @@ impl TmpVarResolver {
     }
 }
 
+/// Initial TACKY translation that relies on pseudo operands.
 fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<InstructionAsm> {
     let mut res = Vec::with_capacity(tacky_instrs.len() * 2);
 
@@ -352,14 +391,14 @@ fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<Instruction
         match tacky_instr {
             InstructionTacky::Ret { v } => res.append(&mut vec![
                 InstructionAsm::Mov {
-                    src: translate_valtacky(v),
+                    src: v.into(),
                     dst: OperandAsm::Reg { r: Register::AX },
                 },
                 InstructionAsm::Ret,
             ]),
             InstructionTacky::Unary { op, src, dst } => {
-                let src = translate_valtacky(src);
-                let dst = translate_valtacky(dst);
+                let src: OperandAsm = src.into();
+                let dst: OperandAsm = dst.into();
                 res.append(&mut vec![
                     InstructionAsm::Mov {
                         src,
@@ -377,9 +416,9 @@ fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<Instruction
                 src2,
                 dst,
             } => {
-                let src1 = translate_valtacky(src1);
-                let src2 = translate_valtacky(src2);
-                let dst = translate_valtacky(dst);
+                let src1 = src1.into();
+                let src2 = src2.into();
+                let dst = dst.into();
                 match op {
                     BinaryOp::Divide => res.append(&mut vec![
                         InstructionAsm::Mov {
@@ -418,6 +457,21 @@ fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<Instruction
                     ]),
                 }
             }
+            InstructionTacky::JumpIfZero { src, target } => res.append(&mut vec![
+                InstructionAsm::Cmp {
+                    op1: OperandAsm::Imm { int: 0 },
+                    op2: src.into(),
+                },
+                InstructionAsm::JmpCC(CondCode::E, target),
+            ]),
+            InstructionTacky::JumpIfNotZero { src, target } => res.append(&mut vec![
+                InstructionAsm::Cmp {
+                    op1: OperandAsm::Imm { int: 0 },
+                    op2: src.into(),
+                },
+                InstructionAsm::JmpCC(CondCode::NE, target),
+            ]),
+            InstructionTacky::Label(l) => res.push(InstructionAsm::Label(l)),
             _ => todo!("support other TACKY"),
         }
     }
@@ -425,9 +479,11 @@ fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<Instruction
     res
 }
 
-fn translate_valtacky(tval: ValTacky) -> OperandAsm {
-    match tval {
-        ValTacky::Const { int } => OperandAsm::Imm { int },
-        ValTacky::TmpVar { no } => OperandAsm::Pseudo { id: no },
+impl Into<OperandAsm> for ValTacky {
+    fn into(self) -> OperandAsm {
+        match self {
+            ValTacky::Const { int } => OperandAsm::Imm { int },
+            ValTacky::TmpVar { no } => OperandAsm::Pseudo { id: no },
+        }
     }
 }

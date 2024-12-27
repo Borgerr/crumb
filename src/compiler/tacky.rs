@@ -19,7 +19,7 @@ pub struct FunDefTacky {
 
 /// TACKY identifier.
 /// may need to make more complex down the line.
-type Identifier = String; // may need to make more complex
+pub(crate) type Identifier = String; // may need to make more complex
 
 /// TACKY instruction
 /// ### Grammar as of v0.1.3
