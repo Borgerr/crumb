@@ -293,7 +293,7 @@ fn resolve_binary(instr: InstructionAsm, instrs: &mut Vec<InstructionAsm>) {
                     dst: OperandAsm::Reg { r: Register::R11 },
                 },
                 InstructionAsm::Binary {
-                    binop: binop.clone(),
+                    binop: *binop,
                     src: *src,
                     dst: OperandAsm::Reg { r: Register::R11 },
                 },
@@ -312,7 +312,7 @@ fn resolve_binary(instr: InstructionAsm, instrs: &mut Vec<InstructionAsm>) {
                             dst: OperandAsm::Reg { r: Register::R10 },
                         },
                         InstructionAsm::Binary {
-                            binop: binop.clone(),
+                            binop: *binop,
                             src: OperandAsm::Reg { r: Register::R10 },
                             dst: *dst,
                         },
@@ -399,16 +399,26 @@ fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<Instruction
             InstructionTacky::Unary { op, src, dst } => {
                 let src: OperandAsm = src.into();
                 let dst: OperandAsm = dst.into();
-                res.append(&mut vec![
-                    InstructionAsm::Mov {
-                        src,
-                        dst: dst.clone(),
-                    },
-                    InstructionAsm::Unary {
-                        unop: op,
-                        operand: dst,
-                    },
-                ])
+                match op {
+                    UnaryOp::Not => res.append(&mut vec![
+                        InstructionAsm::Cmp {
+                            op1: OperandAsm::Imm { int: 0 },
+                            op2: src,
+                        },
+                        InstructionAsm::Mov {
+                            src: OperandAsm::Imm { int: 0 },
+                            dst,
+                        },
+                        InstructionAsm::SetCC(CondCode::E, dst),
+                    ]),
+                    _ => res.append(&mut vec![
+                        InstructionAsm::Mov { src, dst: dst },
+                        InstructionAsm::Unary {
+                            unop: op,
+                            operand: dst,
+                        },
+                    ]),
+                }
             }
             InstructionTacky::Binary {
                 op,
@@ -445,10 +455,7 @@ fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<Instruction
                         },
                     ]),
                     _ => res.append(&mut vec![
-                        InstructionAsm::Mov {
-                            src: src1,
-                            dst: dst.clone(),
-                        },
+                        InstructionAsm::Mov { src: src1, dst },
                         InstructionAsm::Binary {
                             binop: op,
                             src: src2,
