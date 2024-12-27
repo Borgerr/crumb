@@ -158,6 +158,15 @@ impl Display for OperandAsm {
     }
 }
 
+impl Into<OperandAsm> for ValTacky {
+    fn into(self) -> OperandAsm {
+        match self {
+            ValTacky::Const { int } => OperandAsm::Imm { int },
+            ValTacky::TmpVar { no } => OperandAsm::Pseudo { id: no },
+        }
+    }
+}
+
 /// x86-64 registers
 /// ### Used registers as of v0.1.2
 /// - AX
@@ -385,7 +394,7 @@ impl TmpVarResolver {
 
 /// Initial TACKY translation that relies on pseudo operands.
 fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<InstructionAsm> {
-    let mut res = Vec::with_capacity(tacky_instrs.len() * 2);
+    let mut res: Vec<InstructionAsm> = Vec::with_capacity(tacky_instrs.len() * 2);
 
     for tacky_instr in tacky_instrs.into_iter() {
         match tacky_instr {
@@ -454,6 +463,14 @@ fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<Instruction
                             dst,
                         },
                     ]),
+                    BinaryOp::And
+                    | BinaryOp::Or
+                    | BinaryOp::Equal
+                    | BinaryOp::NotEqual
+                    | BinaryOp::Geq
+                    | BinaryOp::GreaterThan
+                    | BinaryOp::Leq
+                    | BinaryOp::LessThan => translate_logical_binary(src1, src2, dst, op, &mut res),
                     _ => res.append(&mut vec![
                         InstructionAsm::Mov { src: src1, dst },
                         InstructionAsm::Binary {
@@ -486,11 +503,42 @@ fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<Instruction
     res
 }
 
-impl Into<OperandAsm> for ValTacky {
-    fn into(self) -> OperandAsm {
-        match self {
-            ValTacky::Const { int } => OperandAsm::Imm { int },
-            ValTacky::TmpVar { no } => OperandAsm::Pseudo { id: no },
-        }
+/// Helper function for translating logical binary instructions with pseudo operands.
+///
+/// `op` is assumed to only ever be a logical binary operator, and guaranteed from `translate_with_pseudo`.
+fn translate_logical_binary(
+    src1: OperandAsm,
+    src2: OperandAsm,
+    dst: OperandAsm,
+    op: BinaryOp,
+    res: &mut Vec<InstructionAsm>,
+) {
+    match op {
+        BinaryOp::And => todo!(),
+        BinaryOp::Or => todo!(),
+        _ => res.append(&mut vec![
+            InstructionAsm::Cmp {
+                op1: src2,
+                op2: src1,
+            },
+            InstructionAsm::Mov {
+                src: OperandAsm::Imm { int: 0 },
+                dst,
+            },
+            InstructionAsm::SetCC(
+                match op {
+                    BinaryOp::Equal => CondCode::E,
+                    BinaryOp::Leq => CondCode::LE,
+                    BinaryOp::Geq => CondCode::GE,
+                    BinaryOp::LessThan => CondCode::L,
+                    BinaryOp::GreaterThan => CondCode::G,
+                    BinaryOp::NotEqual => CondCode::NE,
+                    _ => {
+                        panic!("if this panics, this is a crazy problem with rustc. make an issue.")
+                    }
+                },
+                dst,
+            ),
+        ]),
     }
 }
