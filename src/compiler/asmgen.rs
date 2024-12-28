@@ -193,7 +193,7 @@ impl Display for Register {
 }
 
 /// x86-64 condition codes
-/// ### Used Condition codes as of v0.1.2
+/// ### Used Condition codes as of v0.1.3
 /// - Equal
 /// - Not equal
 /// - Greater
@@ -273,7 +273,8 @@ fn fix_up_instrs(resolved_instrs: Vec<InstructionAsm>, min_used: i32) -> Vec<Ins
                 binop: _,
                 src: _,
                 dst: _,
-            } => resolve_binary(instr, &mut res),
+            }
+            | InstructionAsm::Cmp { op1: _, op2: _ } => resolve_binary(instr, &mut res),
             InstructionAsm::Idiv { operand } => match operand {
                 OperandAsm::Imm { int } => res.append(&mut vec![
                     InstructionAsm::Mov {
@@ -294,8 +295,8 @@ fn fix_up_instrs(resolved_instrs: Vec<InstructionAsm>, min_used: i32) -> Vec<Ins
 }
 
 fn resolve_binary(instr: InstructionAsm, instrs: &mut Vec<InstructionAsm>) {
-    if let InstructionAsm::Binary { binop, src, dst } = &instr {
-        match binop {
+    match &instr {
+        InstructionAsm::Binary { binop, src, dst } => match binop {
             BinaryOp::Multiply => instrs.append(&mut vec![
                 InstructionAsm::Mov {
                     src: *dst,
@@ -330,7 +331,26 @@ fn resolve_binary(instr: InstructionAsm, instrs: &mut Vec<InstructionAsm>) {
                     instrs.push(instr)
                 }
             }
+        },
+        InstructionAsm::Cmp { op1, op2 } => {
+            if matches!(op1, OperandAsm::Stack { off: _ })
+                && matches!(op2, OperandAsm::Stack { off: _ })
+            {
+                instrs.append(&mut vec![
+                    InstructionAsm::Mov {
+                        src: *op1,
+                        dst: OperandAsm::Reg { r: Register::R10 },
+                    },
+                    InstructionAsm::Cmp {
+                        op1: OperandAsm::Reg { r: Register::R10 },
+                        op2: *op2,
+                    },
+                ])
+            } else {
+                instrs.push(instr)
+            }
         }
+        _ => (),
     }
 }
 
@@ -372,6 +392,11 @@ impl TmpVarResolver {
             InstructionAsm::Idiv { operand } => InstructionAsm::Idiv {
                 operand: self.temp_to_stack(operand),
             },
+            InstructionAsm::Cmp { op1, op2 } => InstructionAsm::Cmp {
+                op1: self.temp_to_stack(op1),
+                op2: self.temp_to_stack(op2),
+            },
+            InstructionAsm::SetCC(cc, operand) => InstructionAsm::SetCC(cc, operand),
             _ => instr,
         }
     }
@@ -463,9 +488,7 @@ fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<Instruction
                             dst,
                         },
                     ]),
-                    BinaryOp::And
-                    | BinaryOp::Or
-                    | BinaryOp::Equal
+                    BinaryOp::Equal // at this point, And and Or should be translated to conditional jumps
                     | BinaryOp::NotEqual
                     | BinaryOp::Geq
                     | BinaryOp::GreaterThan
@@ -513,32 +536,28 @@ fn translate_logical_binary(
     op: BinaryOp,
     res: &mut Vec<InstructionAsm>,
 ) {
-    match op {
-        BinaryOp::And => todo!(),
-        BinaryOp::Or => todo!(),
-        _ => res.append(&mut vec![
-            InstructionAsm::Cmp {
-                op1: src2,
-                op2: src1,
+    res.append(&mut vec![
+        InstructionAsm::Cmp {
+            op1: src2,
+            op2: src1,
+        },
+        InstructionAsm::Mov {
+            src: OperandAsm::Imm { int: 0 },
+            dst,
+        },
+        InstructionAsm::SetCC(
+            match op {
+                BinaryOp::Equal => CondCode::E,
+                BinaryOp::Leq => CondCode::LE,
+                BinaryOp::Geq => CondCode::GE,
+                BinaryOp::LessThan => CondCode::L,
+                BinaryOp::GreaterThan => CondCode::G,
+                BinaryOp::NotEqual => CondCode::NE,
+                _ => {
+                    panic!("if this panics, this is a crazy problem with rustc. make an issue.")
+                }
             },
-            InstructionAsm::Mov {
-                src: OperandAsm::Imm { int: 0 },
-                dst,
-            },
-            InstructionAsm::SetCC(
-                match op {
-                    BinaryOp::Equal => CondCode::E,
-                    BinaryOp::Leq => CondCode::LE,
-                    BinaryOp::Geq => CondCode::GE,
-                    BinaryOp::LessThan => CondCode::L,
-                    BinaryOp::GreaterThan => CondCode::G,
-                    BinaryOp::NotEqual => CondCode::NE,
-                    _ => {
-                        panic!("if this panics, this is a crazy problem with rustc. make an issue.")
-                    }
-                },
-                dst,
-            ),
-        ]),
-    }
+            dst,
+        ),
+    ])
 }
