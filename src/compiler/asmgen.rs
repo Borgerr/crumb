@@ -129,7 +129,11 @@ impl Display for InstructionAsm {
                 ),
             },
             Self::Idiv { operand } => write!(f, "idivl {}", operand),
-            _ => todo!("implement for other instructions"),
+            InstructionAsm::Cmp { op1, op2 } => write!(f, "cmpl {}, {}", op1, op2),
+            InstructionAsm::Jmp(label) => write!(f, "jmp {}", label),
+            InstructionAsm::JmpCC(cond_code, label) => write!(f, "jmp{}, {}", cond_code, label),
+            InstructionAsm::SetCC(cond_code, label) => write!(f, "set{}, {}", cond_code, label),
+            InstructionAsm::Label(label) => write!(f, "{}:", label),
         }
     }
 }
@@ -212,7 +216,14 @@ pub enum CondCode {
 
 impl Display for CondCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        match self {
+            CondCode::E => write!(f, "e"),
+            CondCode::NE => write!(f, "ne"),
+            CondCode::G => write!(f, "g"),
+            CondCode::GE => write!(f, "ge"),
+            CondCode::L => write!(f, "l"),
+            CondCode::LE => write!(f, "le"),
+        }
     }
 }
 
