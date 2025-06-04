@@ -171,6 +171,12 @@ impl Into<OperandAsm> for ValTacky {
     }
 }
 
+impl Into<OperandAsm> for i32 {
+    fn into(self) -> OperandAsm {
+        OperandAsm::Imm { int: self }
+    }
+}
+
 /// x86-64 registers
 /// ### Used registers as of v0.1.2
 /// - AX
@@ -534,6 +540,10 @@ fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<Instruction
                 InstructionAsm::JmpCC(CondCode::NE, target),
             ]),
             InstructionTacky::Label(l) => res.push(InstructionAsm::Label(l)),
+            InstructionTacky::Copy { src, dst } => res.push(InstructionAsm::Mov {
+                src: src.into(),
+                dst: dst.into(),
+            }),
             _ => todo!("support other TACKY"),
         }
     }
@@ -575,4 +585,101 @@ fn translate_logical_binary(
             dst,
         ),
     ])
+}
+
+/// ## TESTS THE FOLLOWING TRANSLATION
+/// ## TACKY (input):
+/// ```text
+/// v1 = 1
+/// JumpIfZero(v1, false_label0)
+/// v2 = 2
+/// JumpIfZero(v2, false_label0)
+/// result = 1
+/// Jump(end0)
+/// Label(false_label0)
+/// result = 0
+/// Label(end0)
+/// ```
+#[test]
+fn translate_and_from_tacky() {
+    let tacky: Vec<InstructionTacky> = vec![
+        // following evaluating the first expression; do we need to change to some tmp var?
+        InstructionTacky::Copy {
+            src: 1.into(),
+            dst: ValTacky::TmpVar { no: 0 },
+        },
+        InstructionTacky::JumpIfZero {
+            src: ValTacky::TmpVar { no: 0 },
+            target: Identifier::from("false_label0"),
+        },
+        InstructionTacky::Copy {
+            src: 2.into(),
+            dst: ValTacky::TmpVar { no: 1 },
+        },
+        // following evaluating the second expression; do we need to change to some tmp var?
+        InstructionTacky::JumpIfZero {
+            src: ValTacky::TmpVar { no: 1 },
+            target: Identifier::from("false_label0"),
+        },
+        InstructionTacky::Copy {
+            src: 1.into(),
+            dst: ValTacky::TmpVar { no: 2 },
+        },
+        InstructionTacky::Jump {
+            target: Identifier::from("end0"),
+        },
+        InstructionTacky::Label(Identifier::from("false_label0")),
+        InstructionTacky::Copy {
+            src: 0.into(),
+            dst: ValTacky::TmpVar { no: 2 },
+        },
+        InstructionTacky::Label(Identifier::from("end0")),
+        InstructionTacky::Ret {
+            v: ValTacky::TmpVar { no: 2 },
+        },
+    ];
+
+    let instrs: Vec<InstructionAsm> = vec![
+        // following evaluating the first expression; do we need to change to some tmp var?
+        InstructionAsm::Mov {
+            src: 1.into(),
+            dst: ValTacky::TmpVar { no: 0 }.into(),
+        },
+        InstructionAsm::Cmp {
+            // START OF JUMPIFZERO
+            op1: 0.into(),
+            op2: ValTacky::TmpVar { no: 0 }.into(),
+        },
+        InstructionAsm::JmpCC(CondCode::E, Identifier::from("false_label0")), // END OF JUMPIFZERO
+        InstructionAsm::Mov {
+            src: 2.into(),
+            dst: ValTacky::TmpVar { no: 1 }.into(),
+        }, 
+        // following evaluating the second expression; do we need to change to some tmp var?
+        InstructionAsm::Cmp {   // START OF JUMPIFZERO
+            op1: 0.into(),
+            op2: ValTacky::TmpVar { no: 1 }.into(),
+        },
+        InstructionAsm::JmpCC(CondCode::E, Identifier::from("false_label0")),   // END OF JUMPIFZERO
+        InstructionAsm::Mov  {
+            src: 1.into(),
+            dst: ValTacky::TmpVar { no: 2 }.into(),
+        },
+        InstructionAsm::Jmp(Identifier::from("end0")),
+        InstructionAsm::Label(Identifier::from("false_label0")),
+        InstructionAsm::Mov {
+            src: 0.into(),
+            dst: ValTacky::TmpVar { no: 2 }.into(),
+        },
+        InstructionAsm::Label(Identifier::from("end0")),
+        // START OF RET
+        InstructionAsm::Mov {
+            src: ValTacky::TmpVar { no: 2}.into(),
+            dst: OperandAsm::Reg { r: Register::AX },
+        },
+        InstructionAsm::Ret,
+        // END OF RET
+    ];
+
+    assert_eq!(translate_with_pseudo(tacky), instrs);
 }

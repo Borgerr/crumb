@@ -433,7 +433,7 @@ fn translate_one_plus_one() {
 /// Label(end0)
 /// ```
 #[test]
-fn translate_and() {
+fn translate_and_to_tacky() {
     let statement = StatementC::Return {
         exp: Box::new(Exp::Binary {
             op: BinaryOp::And,
