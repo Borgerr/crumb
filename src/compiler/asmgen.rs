@@ -232,12 +232,14 @@ pub fn emit_asm(asmprog: ProgramAsm, output_file: String) -> std::io::Result<()>
     fs::write(output_file, format!("{}", asmprog))
 }
 
+/// Generates an ASM program structure from a TACKY structure.
 pub fn gen_asm(tacky_prog: ProgramTacky) -> ProgramAsm {
     ProgramAsm {
         function: Box::new(translate_fundef(*tacky_prog.function)),
     }
 }
 
+/// Translates a function definition from its TACKY representation.
 fn translate_fundef(tacky_fundef: FunDefTacky) -> FunDefAsm {
     let pseudo_instrs = translate_with_pseudo(tacky_fundef.instructions);
     let mut tmp_resolver = TmpVarResolver::new();
@@ -305,6 +307,8 @@ fn fix_up_instrs(resolved_instrs: Vec<InstructionAsm>, min_used: i32) -> Vec<Ins
     res
 }
 
+/// Takes a binary operation and modifies the instructions vector in place.
+/// Imagine this as being a branch in `fix_up_instrs`.
 fn resolve_binary(instr: InstructionAsm, instrs: &mut Vec<InstructionAsm>) {
     match &instr {
         InstructionAsm::Binary { binop, src, dst } => match binop {
