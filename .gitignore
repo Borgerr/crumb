@@ -15,3 +15,7 @@ Cargo.lock
 
 # Compiled programs
 main
+
+# Files for testing only
+# Globbing all file types as we rely on different representations
+test*
