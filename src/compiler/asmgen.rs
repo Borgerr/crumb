@@ -112,7 +112,7 @@ impl Display for InstructionAsm {
             Self::Unary { unop, operand } => match unop {
                 UnaryOp::Negate => write!(f, "negl {}", operand),
                 UnaryOp::BitwiseComplement => write!(f, "notl {}", operand),
-                UnaryOp::Not => todo!(),
+                UnaryOp::Not => todo!("Double check if this should be reachable or not"),
             },
             Self::AllocStack { off } => write!(f, "subq ${}, %rsp", -1 * off),
             Self::Cdq => write!(f, "cdq"),
@@ -133,7 +133,7 @@ impl Display for InstructionAsm {
             InstructionAsm::Jmp(label) => write!(f, "jmp .L{}", label),
             InstructionAsm::JmpCC(cond_code, label) => write!(f, "j{} .L{}", cond_code, label),
             InstructionAsm::SetCC(cond_code, label) => write!(f, "set{} {}", cond_code, label),
-            InstructionAsm::Label(label) => write!(f, ".L{}:", label),  // .L label used for local labels
+            InstructionAsm::Label(label) => write!(f, ".L{}:", label), // .L label used for local labels
         }
     }
 }
@@ -395,16 +395,20 @@ impl TmpVarResolver {
         self.min_used
     }
 
+    /// Main driver for actually resolving temporary variables into stack references.
     fn resolve_temps(&mut self, instr: InstructionAsm) -> InstructionAsm {
         match instr {
             InstructionAsm::Mov { src, dst } => InstructionAsm::Mov {
                 src: self.temp_to_stack(src),
                 dst: self.temp_to_stack(dst),
             },
-            InstructionAsm::Unary { unop, operand } => InstructionAsm::Unary {
-                unop,
-                operand: self.temp_to_stack(operand),
-            },
+            InstructionAsm::Unary { unop, operand } => {
+                //println!("(!) unop --> {}", unop);
+                InstructionAsm::Unary {
+                    unop,
+                    operand: self.temp_to_stack(operand),
+                }
+            }
             InstructionAsm::Binary { binop, src, dst } => InstructionAsm::Binary {
                 binop,
                 src: self.temp_to_stack(src),
@@ -417,12 +421,15 @@ impl TmpVarResolver {
                 op1: self.temp_to_stack(op1),
                 op2: self.temp_to_stack(op2),
             },
-            InstructionAsm::SetCC(cc, operand) => InstructionAsm::SetCC(cc, operand),
+            InstructionAsm::SetCC(cc, operand) => {
+                InstructionAsm::SetCC(cc, self.temp_to_stack(operand))
+            }
             _ => instr,
         }
     }
 
     fn temp_to_stack(&mut self, operand: OperandAsm) -> OperandAsm {
+        // TODO: this is definitely way too complicated.
         match operand {
             OperandAsm::Pseudo { id } => match self.id_to_off.get(&id) {
                 Some(off) => OperandAsm::Stack { off: *off },
@@ -455,6 +462,30 @@ fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<Instruction
                 let src: OperandAsm = src.into();
                 let dst: OperandAsm = dst.into();
                 match op {
+                    // NOT case:
+                    // e.g. !1
+                    // represented as:
+                    // ```rust
+                    // InstructionTacky::Unary {
+                    //   op: UnaryOp::Not,
+                    //   src: ValTacky::Const { int: 1 },
+                    //   dst: ValTacky::TmpVar { no: 0 },
+                    // },
+                    // ```
+                    // here becomes:
+                    // ```rust
+                    // vec![
+                    //   InstructionAsm::Cmp {
+                    //     op1: OperandAsm::Imm{ int: 0 },
+                    //     op2: src,    // where src is 1.into<ValTacky>()
+                    //   },
+                    //   InstructionAsm::Mov {
+                    //     src: OperandAsm::Imm { int: 0 },
+                    //     dst,     // where dst is ValTacky::TmpVar { no: 0 },
+                    //   },
+                    //   InstructionAsm::SetCC(CondCode::E, dst),
+                    // ];
+                    // ```
                     UnaryOp::Not => res.append(&mut vec![
                         InstructionAsm::Cmp {
                             op1: OperandAsm::Imm { int: 0 },
@@ -466,7 +497,7 @@ fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<Instruction
                         },
                         InstructionAsm::SetCC(CondCode::E, dst),
                     ]),
-                    _ => res.append(&mut vec![
+                    UnaryOp::BitwiseComplement | UnaryOp::Negate => res.append(&mut vec![
                         InstructionAsm::Mov { src, dst: dst },
                         InstructionAsm::Unary {
                             unop: op,
@@ -655,14 +686,15 @@ fn translate_and_from_tacky() {
         InstructionAsm::Mov {
             src: 2.into(),
             dst: ValTacky::TmpVar { no: 1 }.into(),
-        }, 
+        },
         // following evaluating the second expression; do we need to change to some tmp var?
-        InstructionAsm::Cmp {   // START OF JUMPIFZERO
+        InstructionAsm::Cmp {
+            // START OF JUMPIFZERO
             op1: 0.into(),
             op2: ValTacky::TmpVar { no: 1 }.into(),
         },
-        InstructionAsm::JmpCC(CondCode::E, Identifier::from("false_label0")),   // END OF JUMPIFZERO
-        InstructionAsm::Mov  {
+        InstructionAsm::JmpCC(CondCode::E, Identifier::from("false_label0")), // END OF JUMPIFZERO
+        InstructionAsm::Mov {
             src: 1.into(),
             dst: ValTacky::TmpVar { no: 2 }.into(),
         },
@@ -675,7 +707,7 @@ fn translate_and_from_tacky() {
         InstructionAsm::Label(Identifier::from("end0")),
         // START OF RET
         InstructionAsm::Mov {
-            src: ValTacky::TmpVar { no: 2}.into(),
+            src: ValTacky::TmpVar { no: 2 }.into(),
             dst: OperandAsm::Reg { r: Register::AX },
         },
         InstructionAsm::Ret,
@@ -683,4 +715,79 @@ fn translate_and_from_tacky() {
     ];
 
     assert_eq!(translate_with_pseudo(tacky), instrs);
+}
+
+// ------------------------
+// PSEUDO TRANSLATION TESTS
+// ------------------------
+
+#[test]
+fn translate_bitwisenot_with_pseudo() {
+    let inp = vec![InstructionTacky::Unary {
+        op: UnaryOp::BitwiseComplement,
+        src: ValTacky::Const { int: 1 },
+        dst: ValTacky::TmpVar { no: 0 },
+    }];
+    let expected_out = vec![
+        InstructionAsm::Mov {
+            src: 1.into(),
+            dst: ValTacky::TmpVar { no: 0 }.into(),
+        },
+        InstructionAsm::Unary {
+            unop: UnaryOp::BitwiseComplement,
+            operand: ValTacky::TmpVar { no: 0 }.into(),
+        },
+    ];
+
+    let res = translate_with_pseudo(inp);
+    assert_eq!(res, expected_out);
+}
+
+#[test]
+fn translate_lognot_with_pseudo() {
+    let inp = vec![InstructionTacky::Unary {
+        op: UnaryOp::Not,
+        src: ValTacky::Const { int: 1 },
+        dst: ValTacky::TmpVar { no: 0 },
+    }];
+    let expected_out = vec![
+        InstructionAsm::Cmp {
+            op1: 0.into(),
+            op2: 1.into(),
+        },
+        InstructionAsm::Mov {
+            src: 0.into(),
+            dst: ValTacky::TmpVar { no: 0 }.into(),
+        },
+        InstructionAsm::SetCC(CondCode::E, ValTacky::TmpVar { no: 0 }.into()),
+    ];
+
+    let res = translate_with_pseudo(inp);
+    assert_eq!(res, expected_out);
+}
+
+#[test]
+fn resolve_mov() {
+    let mut tmp_resolver = TmpVarResolver::new();
+    let mov_with_pseudo = InstructionAsm::Mov {
+        src: 1.into(),
+        dst: ValTacky::TmpVar { no: 0 }.into(),
+    };
+
+    let expected_out = InstructionAsm::Mov {
+        src: 1.into(),
+        dst: OperandAsm::Stack { off: -4 },
+    };
+
+    assert_eq!(tmp_resolver.resolve_temps(mov_with_pseudo), expected_out);
+}
+
+#[test]
+fn resolve_setcc() {
+    let mut tmp_resolver = TmpVarResolver::new();
+    let setcc_with_pseudo = InstructionAsm::SetCC(CondCode::E, ValTacky::TmpVar { no: 0 }.into());
+
+    let expected_out = InstructionAsm::SetCC(CondCode::E, OperandAsm::Stack { off: -4 });
+
+    assert_eq!(tmp_resolver.resolve_temps(setcc_with_pseudo), expected_out);
 }

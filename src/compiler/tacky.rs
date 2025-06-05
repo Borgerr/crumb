@@ -546,3 +546,39 @@ fn translate_or() {
 
     assert_eq!(TackyEmitter::new().translate_statement(statement), instrs);
 }
+
+/// # TESTS THE FOLLOWING TRANSLATION
+/// ## C (AST input):
+/// ```c
+/// return !1;
+/// ```
+/// ### TACKY (output):
+/// ```text
+///
+/// ```
+#[test]
+fn translate_unary_not() {
+    let statement = StatementC::Return {
+        exp: Box::new(Exp::Unary {
+            op: UnaryOp::Not,
+            exp: Box::new(Exp::Const { c: 1 }),
+        }),
+    };
+
+    let instrs = vec![
+        // following evaluating the first expression; do we need to change to some tmp var?
+        InstructionTacky::Unary {
+            op: UnaryOp::Not,
+            src: ValTacky::Const { int: 1 },
+            dst: ValTacky::TmpVar { no: 0 },
+        },
+        InstructionTacky::Ret {
+            v: ValTacky::TmpVar { no: 0 },
+        },
+    ];
+
+    assert_eq!(TackyEmitter::new().translate_statement(statement), instrs);
+}
+// NOTE: binary logical equals omitted (for now) as it follows a similar pattern
+// we keep the simplicity here in TACKY, but then later in ASM we unravel into more instructions
+// this is partially to keep the goal of keeping things ISA agnostic, as far as TACKY is concerned
