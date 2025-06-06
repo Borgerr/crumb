@@ -487,6 +487,23 @@ fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<Instruction
                     // ];
                     // ```
                     UnaryOp::Not => res.append(&mut vec![
+                        // TODO: it's insufficient to just plop the source into the Cmp instruction
+                        // because of Tacky like !1 --> Simple unary op Not of 1, we get a result
+                        // Cmpl $0, $1.
+                        // ^^ This is invalid syntax.
+                        // We either need to reorganize how src ends up here (likely more difficult than what's worth)
+                        // or Mov the source somewhere before the Cmp
+
+                        /* POSSIBLE FIX:
+                        InstructionAsm::Mov {
+                            src: src.into(),
+                            dst: OperandAsm::Reg { r: Register::AX },
+                        },
+                        InstructionAsm::Cmp {
+                            op1: OperandAsm::Imm { int: 0 },
+                            op2: OperandAsm::Reg { r: Register::AX },
+                        },
+                        */
                         InstructionAsm::Cmp {
                             op1: OperandAsm::Imm { int: 0 },
                             op2: src,
