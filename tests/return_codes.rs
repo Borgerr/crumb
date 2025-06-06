@@ -67,11 +67,36 @@ fn logical_eq(left: u8, right: u8) -> i8 {
 fn logical_neq(left: u8, right: u8) -> i8 {
     logical_op(left, right, |l: u8, r: u8| l != r)
 }
-fn logical_not(term: u8) -> i8 {
-    if term != 0 {
-        0
-    } else {
-        1
+
+// this is really dumb but I love it
+trait EqZero {
+    fn eqzero(&self) -> i8; // i8 again for ease of use
+}
+impl EqZero for u8 {
+    fn eqzero(&self) -> i8 {
+        if *self != 0 {
+            0
+        } else {
+            1
+        }
+    }
+}
+impl EqZero for i8 {
+    fn eqzero(&self) -> i8 {
+        if *self != 0 {
+            0
+        } else {
+            1
+        }
+    }
+}
+impl EqZero for i32 {
+    fn eqzero(&self) -> i8 {
+        if *self != 0 {
+            0
+        } else {
+            1
+        }
     }
 }
 
@@ -129,18 +154,10 @@ basic_mainret!(
     1 + 2 | 2 + 1
 );
 
-basic_mainret!(return_lognot_one, "!1", logical_not(1));
-basic_mainret!(return_lognot_zero, "!0", logical_not(0));
-basic_mainret!(
-    return_lognot_lognot_one,
-    "!!1",
-    logical_not(logical_not(1) as u8)
-);
-basic_mainret!(
-    return_lognot_lognot_zero,
-    "!!0",
-    logical_not(logical_not(0) as u8)
-);
+basic_mainret!(return_lognot_one, "!1", 1.eqzero());
+basic_mainret!(return_lognot_zero, "!0", 0.eqzero());
+basic_mainret!(return_lognot_lognot_one, "!!1", 1.eqzero().eqzero());
+basic_mainret!(return_lognot_lognot_zero, "!!0", 0.eqzero().eqzero());
 basic_mainret!(return_one_logand_two, "1 && 2", logical_and(1, 2));
 basic_mainret!(return_one_logor_two, "1 || 2", logical_or(1, 2));
 basic_mainret!(return_one_logeq_two, "1 == 2", logical_eq(1, 2));
