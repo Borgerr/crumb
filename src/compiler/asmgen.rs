@@ -494,7 +494,7 @@ fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<Instruction
                         // We either need to reorganize how src ends up here (likely more difficult than what's worth)
                         // or Mov the source somewhere before the Cmp
 
-                        /* POSSIBLE FIX:
+                        // POSSIBLE FIX:
                         InstructionAsm::Mov {
                             src: src.into(),
                             dst: OperandAsm::Reg { r: Register::AX },
@@ -503,11 +503,13 @@ fn translate_with_pseudo(tacky_instrs: Vec<InstructionTacky>) -> Vec<Instruction
                             op1: OperandAsm::Imm { int: 0 },
                             op2: OperandAsm::Reg { r: Register::AX },
                         },
-                        */
+                        /*
                         InstructionAsm::Cmp {
                             op1: OperandAsm::Imm { int: 0 },
                             op2: src,
                         },
+                        */
+                        // note above fix may be incorrect depending on if we're utilizing AX. Need to review register allocation.
                         InstructionAsm::Mov {
                             src: OperandAsm::Imm { int: 0 },
                             dst,
@@ -768,9 +770,13 @@ fn translate_lognot_with_pseudo() {
         dst: ValTacky::TmpVar { no: 0 },
     }];
     let expected_out = vec![
+        InstructionAsm::Mov {
+            src: 1.into(),
+            dst: OperandAsm::Reg { r: Register::AX },
+        },
         InstructionAsm::Cmp {
             op1: 0.into(),
-            op2: 1.into(),
+            op2: OperandAsm::Reg { r: Register::AX },
         },
         InstructionAsm::Mov {
             src: 0.into(),
